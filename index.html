@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍭 ClassDojo Chaos Royale: 10 Players 🍭</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Zcool+KuaiLe&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fff0f5;
+            --accent: #fdffb6;
+            --text: #5d576b;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: radial-gradient(#ffd1dc 20%, transparent 20%), radial-gradient(#bde0fe 20%, transparent 20%);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            font-family: 'Zcool KuaiLe', sans-serif;
+            color: var(--text);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px;
+            background: #fff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border-radius: 0 0 30px 30px;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        h1 { margin: 0; font-size: 2rem; color: #ff9a9e; }
+
+        /* --- 竞技场 --- */
+        .arena-container {
+            flex: 1;
+            position: relative;
+            max-width: 1200px;
+            margin: 10px auto;
+            width: 100%;
+            /* 移除Grid，完全依靠JS计算位置 */
+        }
+
+        /* 选手卡片 */
+        .fighter {
+            position: absolute;
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #fff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            transition: transform 0.3s, opacity 0.5s, top 0.5s, left 0.5s;
+            width: 110px; /* 默认宽度变小以适应更多人 */
+            z-index: 10;
+        }
+        
+        /* 掉落动画 */
+        @keyframes dropOut {
+            0% { transform: scale(1) rotate(0deg); opacity: 1; }
+            20% { transform: scale(1.1) rotate(-10deg); opacity: 1; }
+            100% { transform: translateY(800px) rotate(45deg) scale(0.5); opacity: 0; }
+        }
+
+        .fighter.dead {
+            animation: dropOut 1s forwards ease-in;
+            pointer-events: none;
+        }
+
+        /* 血条 */
+        .hp-box {
+            width: 90%; height: 12px; background: #eee; border-radius: 10px;
+            overflow: hidden; margin-bottom: 2px; position: relative;
+            border: 1px solid #fff;
+        }
+        .hp-bar { height: 100%; width: 100%; transition: width 0.5s ease-out; }
+        
+        .hp-text { position: absolute; width: 100%; text-align: center; line-height: 12px; color: #fff; font-size: 0.6rem; font-weight: bold; text-shadow: 1px 1px 0 rgba(0,0,0,0.5); top:0; left:0;}
+
+        .avatar { font-size: 3.5rem; margin: 0; filter: drop-shadow(0 5px 0 rgba(0,0,0,0.1)); transition: transform 0.2s; }
+        
+        .name { font-size: 0.9rem; background: #f4f4f4; padding: 2px 8px; border-radius: 20px; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+        /* 中央日志 */
+        .center-stage {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: rgba(255,255,255,0.92);
+            border-radius: 50%; /* 圆形 */
+            padding: 20px;
+            border: 6px dashed #ffd6a5;
+            box-shadow: 0 0 50px rgba(255, 214, 165, 0.3);
+            z-index: 5;
+        }
+
+        .log-content { font-size: 1.2rem; line-height: 1.4; width: 100%; }
+        .skill-name { color: #ff9a9e; font-size: 1.4rem; display: block; margin: 5px 0; font-weight: bold; animation: popIn 0.3s; }
+        .dmg { color: #ff6b6b; font-size: 1.8rem; font-weight: 900; animation: popIn 0.3s; display: block; margin-top: 5px; }
+        
+        /* CHASE 砸入特效 */
+        .chase-smash {
+            position: absolute;
+            font-size: 2rem;
+            font-weight: 900;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 15px;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-shadow: 2px 2px 0 #000;
+            white-space: nowrap;
+            animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            pointer-events: none;
+        }
+        .smash-dmg { background: #ff6b6b; border: 4px solid #fff; transform: rotate(-10deg); }
+        .smash-heal { background: #4ecdc4; border: 4px solid #fff; transform: rotate(10deg); }
+
+        /* 选人区 */
+        .roster-area {
+            background: #fff;
+            height: 25vh;
+            border-radius: 30px 30px 0 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+            z-index: 30;
+        }
+        .roster-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+            overflow-y: auto;
+            width: 100%;
+            padding: 5px;
+        }
+        .chip {
+            background: #f8f9fa; padding: 6px 12px; border-radius: 20px; cursor: pointer;
+            border: 2px solid transparent; font-size: 0.9rem; color: #666; transition: all 0.2s;
+        }
+        .chip:hover { transform: translateY(-3px); background: #e9ecef; }
+        .chip.selected { background: #ff9a9e; color: #fff; font-weight: bold; box-shadow: 0 4px 0 #e07f7f; border-color: #fff; }
+
+        /* 按钮 */
+        .btn {
+            background: linear-gradient(to bottom, #9bf6ff, #a0c4ff);
+            color: #fff; border: none; padding: 8px 30px; font-size: 1.2rem;
+            border-radius: 50px; cursor: pointer; box-shadow: 0 5px 0 #7fa6e0;
+            transition: all 0.1s; margin-bottom: 5px; font-family: 'Zcool KuaiLe';
+        }
+        .btn:active { transform: translateY(5px); box-shadow: none; }
+        .btn:disabled { background: #ddd; color: #aaa; box-shadow: none; cursor: not-allowed; transform: none; }
+        .btn.restart { background: linear-gradient(to bottom, #caffbf, #9bf6ff); box-shadow: 0 5px 0 #8bc4a0; color: #444; animation: pulse 1s infinite; }
+
+        #flash { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,192,203,0.6); pointer-events: none; opacity: 0; z-index: 99; }
+        .flash-anim { animation: flash 1.5s; }
+        .particle { position: absolute; font-size: 2rem; pointer-events: none; animation: drop 1s forwards; z-index: 50; }
+
+        /* Chase 弹窗 */
+        .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.85); display: none; justify-content: center; align-items: center; z-index: 200; backdrop-filter: blur(5px); }
+        .modal-box { background: #fff; border: 5px solid #ffadad; padding: 30px; border-radius: 40px; text-align: center; animation: popIn 0.4s; box-shadow: 0 20px 50px rgba(0,0,0,0.1); width: 320px; }
+
+        @keyframes popIn { 0% {transform:scale(0);} 100% {transform:scale(1);} }
+        @keyframes stampIn { 0% {opacity:0; transform:scale(3) rotate(0deg);} 100% {opacity:1; transform:scale(1) rotate(var(--rot));} }
+        @keyframes flash { 0%,100% {opacity:0;} 10%,30%,50% {opacity:1; background:#ffc6ff;} 20%,40% {opacity:0.5;} }
+        @keyframes shake { 0%,100% {transform:rotate(0);} 25% {transform:rotate(5deg);} 75% {transform:rotate(-5deg);} }
+        @keyframes bounce { 0%,100% {transform:translateY(0);} 50% {transform:translateY(-10px);} }
+        @keyframes drop { 0% {opacity:1; transform:translateY(0) scale(1);} 100% {opacity:0; transform:translateY(80px) scale(0.5);} }
+        @keyframes pulse { 0% {transform:scale(1);} 50% {transform:scale(1.05);} 100% {transform:scale(1);} }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🍬 Dojo Chaos Royale 🍬</h1>
+</header>
+
+<div class="arena-container" id="arena">
+    <div class="center-stage">
+        <div class="log-content" id="log-content">
+            选择 3 到 10 名同学<br>开启大乱斗！
+        </div>
+    </div>
+</div>
+
+<div id="flash"></div>
+
+<div class="roster-area">
+    <button class="btn" id="start-btn" onclick="handleMainBtn()" disabled>选 3-10 人开始</button>
+    <div class="roster-grid" id="roster"></div>
+</div>
+
+<div class="modal" id="chase-modal">
+    <div class="modal-box">
+        <div style="font-size:6rem;">🐶</div>
+        <h2 style="color:#666; margin:10px 0;">Chase Says:</h2>
+        <p style="font-size:1.2rem; color:#888;">你们都很棒！<br>下学期继续加油！</p>
+        <button class="btn restart" onclick="resetGame()">再来一局</button>
+    </div>
+</div>
+
+<script>
+    // === 1. 数据录入 ===
+    const rawData = [
+        {t:'普通', n:'【早读霸主】', e:'晨读音量自动增幅300%，带动全班气场'}, {t:'普通', n:'【默写全对！】', e:'听写时笔下生风，正确率锁定100%'}, {t:'普通', n:'【作文超时？】', e:'考试最后10分钟爆肝写出800字高分作文'},
+        {t:'普通', n:'【注释小抄】', e:'课本文言文注释自动浮现在脑海侧边栏'}, {t:'普通', n:'【阅读理解·我懂】', e:'精准揣摩出题人意图，选择题正确率90%+'}, {t:'普通', n:'【背诵通灵】', e:'闭上眼睛课文自动在眼前滚动播放'},
+        {t:'普通', n:'【错别字退散！】', e:'作文中错别字自动变淡并提示正确写法'}, {t:'普通', n:'【成语连环炮】', e:'连续使用三个以上成语不重复且恰当'}, {t:'普通', n:'【标点强迫症】', e:'自动修正所有标点符号使用错误'},
+        {t:'普通', n:'【卷面印刷体】', e:'笔迹自动优化成阅卷老师最爱的工整字体'}, {t:'普通', n:'【古诗词召唤】', e:'任何作文题目都能引用贴切诗句'}, {t:'普通', n:'【答题卡预感】', e:'考前预感哪些考点会出现在答题卡上'},
+        {t:'普通', n:'【素材本显灵】', e:'考场上需要的作文素材自动从记忆中弹出'}, {t:'普通', n:'【时间管理侠】', e:'语文考试时间分配精确到每分钟'}, {t:'普通', n:'【黑板字复刻】', e:'看一眼黑板笔记自动录入笔记本'},
+        {t:'普通', n:'【同桌偷学无效】', e:'防止同桌偷看自己的创新作文思路'}, {t:'普通', n:'【基础扎实】', e:'基础题全对，稳扎稳打！'},
+        {t:'强力', n:'【作文瞬发·千字成文】', e:'40分钟内完成千字作文且达到一类文标准'}, {t:'强力', n:'【古文翻译·信达雅】', e:'文言文翻译不仅准确还富有文采'},
+        {t:'终极', n:'〖文心雕龙·满分领域〗', e:'展开领域，本次语文考试所有主观题获得满分倾向'},
+        {t:'普通', n:'【秒出答案】', e:'看一眼数学题秒出答案，觉得太简单懒得写过程'}, {t:'普通', n:'【草稿纸艺术】', e:'凌乱的草稿纸上藏着完整的解题思路'}, {t:'普通', n:'【公式默写·全对】', e:'数学公式倒背如流，正反向推导自如'},
+        {t:'普通', n:'【几何透视眼】', e:'立体几何图形在脑中自由旋转分解'}, {t:'普通', n:'【应用题翻译官】', e:'将冗长的文字题瞬间转化为数学表达式'}, {t:'普通', n:'【计算器人脑】', e:'复杂心算速度超过同桌按计算器'},
+        {t:'普通', n:'【辅助线天才】', e:'总能画出最关键的那条辅助线'}, {t:'普通', n:'【分类讨论大师】', e:'遇到多情况题目自动列出所有可能'}, {t:'普通', n:'【压轴题挑衅】', e:'越难的题目越兴奋，解题欲望+200%'},
+        {t:'普通', n:'【步骤分收割】', e:'即使答案错了也能拿到90%的步骤分'}, {t:'普通', n:'【数学梗王】', e:'用数学梗解释生活现象，比如“你的笑容是连续函数”'}, {t:'普通', n:'【一题多解秀】', e:'同一道题展示三种以上解法震惊老师'},
+        {t:'普通', n:'【错题本·薄】', e:'错题本只有三页，因为错的题太少'}, {t:'普通', n:'【考试时间刺客】', e:'数学考试总是提前30分钟做完开始检查'}, {t:'普通', n:'【黑板擦争夺战】', e:'抢着上黑板解题，粉笔字写得比老师还快'},
+        {t:'普通', n:'【同桌求助热线】', e:'耐心给同桌讲数学题直到对方真懂'}, {t:'普通', n:'【逻辑严密】', e:'推导过程无懈可击'},
+        {t:'强力', n:'【压轴题破译·五分钟】', e:'五分钟内破解数学卷最后一道大题'}, {t:'强力', n:'【数学建模·生活化】', e:'将任何生活问题转化为数学模型求解'},
+        {t:'终极', n:'〖数学之神·领域展开〗', e:'展开数学领域，本次考试所有题目自动浮现解题思路'},
+        {t:'普通', n:'【超级早到】', e:'永远比值日生早到教室，开始预习'}, {t:'普通', n:'【坐姿端正·标兵】', e:'一节课45分钟腰板挺直，被老师当典范'}, {t:'普通', n:'【笔记配色强迫症】', e:'用五种颜色记笔记，形成个人色码系统'},
+        {t:'普通', n:'【错题本手账化】', e:'错题本装饰得像手账，复习时心情愉悦'}, {t:'普通', n:'【作业全A+】', e:'作业本上全是A+，被各科老师传阅'}, {t:'普通', n:'【课堂点头大师】', e:'老师讲到重点时自动点头，互动感满分'},
+        {t:'普通', n:'【文具收纳术】', e:'笔袋里每支笔按功能颜色排列整齐'}, {t:'普通', n:'【书包减重专家】', e:'每天只带必要课本，书包重量是同学一半'}, {t:'普通', n:'【水杯提醒器】', e:'每节课下课自动喝水，从不忘记'},
+        {t:'普通', n:'【眼保健操模范】', e:'眼保健操穴位精准，被校医点名表扬'}, {t:'普通', n:'【值日从不逃跑】', e:'轮到值日时认真完成，还帮别人打扫'}, {t:'普通', n:'【校服整洁如新】', e:'校服永远干净平整，领子翻得恰到好处'},
+        {t:'普通', n:'【课桌抽屉整理术】', e:'抽屉分三层分类放书，5秒内找到任何课本'}, {t:'普通', n:'【礼貌用语满级】', e:'“老师好”“谢谢”“请”从不离口'}, {t:'普通', n:'【借东西及时还】', e:'借同学的橡皮尺子，用完立刻归还'},
+        {t:'普通', n:'【天气预报员】', e:'每天提醒同桌带伞或加衣，从未出错'}, {t:'普通', n:'【认真听讲】', e:'目光紧随老师'},
+        {t:'强力', n:'【全科笔记·即时生成】', e:'上课同时生成图文并茂的全科笔记'}, {t:'强力', n:'【作业预测·精准】', e:'预测老师会布置什么作业，提前完成'},
+        {t:'终极', n:'〖模范生光环·全员激励〗', e:'释放光环，全班同学纪律性和学习态度提升'},
+        {t:'普通', n:'【英语听力·全对】', e:'英语听力考试从未错过任何一道题'}, {t:'普通', n:'【单词量怪物】', e:'词汇量远超同龄人，读原版小说无压力'}, {t:'普通', n:'【口语模仿秀】', e:'模仿英语老师口音惟妙惟肖，逗笑全班'},
+        {t:'普通', n:'【作文高级词汇】', e:'英语作文里全是高级词汇和复杂句型'}, {t:'普通', n:'【语法纠察队】', e:'自动发现同学口语中的语法错误并友好纠正'}, {t:'普通', n:'【原声电影字幕】', e:'看英文电影不需要字幕，还能翻译给同桌'},
+        {t:'普通', n:'【外教聊天不怕】', e:'和外教自如聊天，话题从天气到哲学'}, {t:'普通', n:'【英语配音达人】', e:'给英语课文配音，一人分饰多角'}, {t:'普通', n:'【单词接龙王者】', e:'单词接龙游戏从未输过，词汇量碾压'},
+        {t:'普通', n:'【英文歌点唱机】', e:'会唱100首英文歌，课间即兴演唱'}, {t:'普通', n:'【俚语收集癖】', e:'收集各种英语俚语，用在作文里让老师惊艳'}, {t:'普通', n:'【快速阅读·英文】', e:'三分钟读完一篇英文文章并概括大意'},
+        {t:'普通', n:'【英语辩论赛MVP】', e:'英语辩论赛中逻辑清晰，用词精准'}, {t:'普通', n:'【翻译信达雅】', e:'中译英不仅准确，还保留原文韵味'}, {t:'普通', n:'【英语角主持人】', e:'主动组织英语角，带动全班口语练习'},
+        {t:'普通', n:'【英文书法美观】', e:'英文书写如印刷体，作文卷面加分'}, {t:'普通', n:'【语感超强】', e:'凭感觉选对答案'},
+        {t:'强力', n:'【同声传译·课堂】', e:'老师中文讲课时，脑中自动生成英文笔记'}, {t:'强力', n:'【单词记忆·过目不忘】', e:'任何单词看一遍就永久记住'},
+        {t:'终极', n:'〖英语思维·母语切换〗', e:'切换为纯英语思维模式，24小时内英语水平翻倍'},
+        {t:'普通', n:'【物理实验·一次成功】', e:'物理实验操作精准，数据完美'}, {t:'普通', n:'【公式推导狂魔】', e:'不满足于背公式，一定要自己推导一遍'}, {t:'普通', n:'【生活物理学家】', e:'用物理原理解释一切生活现象'},
+        {t:'普通', n:'【电路图画家】', e:'画电路图又快又准，连线笔直如尺子量'}, {t:'普通', n:'【受力分析快枪手】', e:'三秒完成复杂受力分析图'}, {t:'普通', n:'【物理梗制造机】', e:'“你的密度比空气小吗？怎么在我心里飘起来了”'},
+        {t:'普通', n:'【单位换算大师】', e:'任何物理单位换算瞬间完成'}, {t:'普通', n:'【实验报告范文】', e:'实验报告被老师当模板全班传阅'}, {t:'普通', n:'【物理模型搭建】', e:'用橡皮泥牙签搭建各种物理模型'},
+        {t:'普通', n:'【难题收集癖】', e:'专门收集各种物理难题，做成个人题库'}, {t:'普通', n:'【物理老师小助手】', e:'帮老师准备实验器材，熟悉每一件设备'}, {t:'普通', n:'【物理竞赛种子】', e:'物理竞赛轻松入围，准备冲省奖'},
+        {t:'普通', n:'【生活中的阿基米德】', e:'洗澡时想到浮力原理，兴奋地跑出来记下'}, {t:'普通', n:'【能量守恒信徒】', e:'坚信能量守恒，学习消耗的能量会以知识形式储存'}, {t:'普通', n:'【物理错题本·薄】', e:'物理错题本只有几页，因为几乎不错'},
+        {t:'普通', n:'【黑板画图高手】', e:'被叫上黑板画物理示意图，赢得掌声'}, {t:'普通', n:'【物理直觉】', e:'对物理现象直觉敏锐'},
+        {t:'强力', n:'【复杂计算·心算完成】', e:'多步骤物理计算无需草稿直接心算'}, {t:'强力', n:'【实验设计·创新】', e:'设计出课本没有的创新性物理实验'},
+        {t:'终极', n:'〖物理法则·局部修改〗', e:'短时间内让局部物理规则按自己想法微调'},
+        {t:'普通', n:'【化学方程式·秒配平】', e:'多复杂方程式都能瞬间配平'}, {t:'普通', n:'【元素周期表·倒背】', e:'元素周期表倒背如流，包括原子量'}, {t:'普通', n:'【实验操作·零失误】', e:'化学实验操作规范，从未打破试管'},
+        {t:'普通', n:'【颜色记忆库】', e:'记住所有化学反应的颜色变化'}, {t:'普通', n:'【化学式猜谜王】', e:'根据描述猜化学物质，一猜就中'}, {t:'普通', n:'【有毒物质·全知道】', e:'熟知哪些化学物质有毒，实验时提醒同学'},
+        {t:'普通', n:'【生活化学家】', e:'“你像乙酸乙酯，散发着让我着迷的香味”'}, {t:'普通', n:'【分子模型搭建】', e:'用球棍模型搭建复杂分子，又快又准'}, {t:'普通', n:'【化学计算·精准】', e:'化学计算题从未因计算错误丢分'},
+        {t:'普通', n:'【实验现象预言家】', e:'预测实验现象，和实际完全一致'}, {t:'普通', n:'【化学史爱好者】', e:'熟悉每个化学发现背后的故事'}, {t:'普通', n:'【药品整理大师】', e:'化学实验室药品柜整理得井井有条'},
+        {t:'普通', n:'【化学趣味实验】', e:'课余做趣味化学实验，吸引同学围观'}, {t:'普通', n:'【化学与生活】', e:'讲解化学知识在生活中的应用，通俗易懂'}, {t:'普通', n:'【化学笔记·彩色】', e:'用不同颜色标注不同类别的化学知识'},
+        {t:'普通', n:'【化学老师得意门生】', e:'化学老师提问时总看向她，知道她会'}, {t:'普通', n:'【试管清洗】', e:'试管洗得干净透明'},
+        {t:'强力', n:'【有机化学·全掌握】', e:'有机化学部分毫无压力，命名反应式全对'}, {t:'强力', n:'【实验安全·绝对领域】', e:'在实验台展开安全领域，防止事故发生'},
+        {t:'终极', n:'〖化学反应·可视化〗', e:'脑中可视化微观化学反应过程，理解深度max'},
+        {t:'普通', n:'【历史时间线·全记】', e:'中外历史大事年表在脑中清晰排列'}, {t:'普通', n:'【历史人物·全家福】', e:'记得重要历史人物的生卒年、事迹、评价'}, {t:'普通', n:'【史料分析·犀利】', e:'分析历史材料角度独特，见解深刻'},
+        {t:'普通', n:'【历史地图·脑内】', e:'脑中存有各个历史时期的疆域地图'}, {t:'普通', n:'【历史故事大王】', e:'把历史事件讲得生动有趣，像说书先生'}, {t:'普通', n:'【历史选择题·全对】', e:'历史选择题正确率接近100%'},
+        {t:'普通', n:'【穿越者思维】', e:'“如果我是秦始皇，我会...”经常这样思考'}, {t:'普通', n:'【历史比较研究】', e:'对比不同文明同一时期的发展'}, {t:'普通', n:'【历史影视剧纠错】', e:'看历史剧时指出不符合史实之处'},
+        {t:'普通', n:'【历史论文·高分】', e:'历史小论文总是最高分，逻辑严密'}, {t:'普通', n:'【历史老师捧哏】', e:'老师讲历史时适时接话，互动良好'}, {t:'普通', n:'【历史与现实】', e:'从历史事件联系现实，有深度思考'},
+        {t:'普通', n:'【历史时间顺口溜】', e:'自编顺口溜记忆历史时间，分享给同学'}, {t:'普通', n:'【历史错题·少见】', e:'历史考试很少错题，知识点全覆盖'}, {t:'普通', n:'【历史课外阅读广】', e:'读过大量历史书籍，知识面远超课本'},
+        {t:'普通', n:'【历史辩论·证据多】', e:'历史辩论中引经据典，证据充分'}, {t:'普通', n:'【朝代歌】', e:'熟唱朝代歌，顺序不乱'},
+        {t:'强力', n:'【史料记忆·过目不忘】', e:'看过的历史材料一遍记住'}, {t:'强力', n:'【历史大题·满分模板】', e:'总结出历史大题的满分答题模板'},
+        {t:'终极', n:'〖历史长河·沉浸体验〗', e:'沉浸式体验某个历史时期，理解更深刻'},
+        {t:'普通', n:'【地理地图·脑内GPS】', e:'脑中自带高清世界地图，随时调用'}, {t:'普通', n:'【气候类型·全掌握】', e:'全球气候类型分布、特点倒背如流'}, {t:'普通', n:'【地理数据记忆库】', e:'各国面积、人口、首都等数据随口说出'},
+        {t:'普通', n:'【地理绘图高手】', e:'手绘地图精准，堪比印刷品'}, {t:'普通', n:'【地理现象解释王】', e:'解释各种地理现象，科学又生动'}, {t:'普通', n:'【地球仪爱好者】', e:'课间常去拨弄教室里的地球仪'},
+        {t:'普通', n:'【地理与生活】', e:'“今天下雨是因为冷锋过境...”'}, {t:'普通', n:'【地理选择题·秒杀】', e:'地理选择题读题即选出正确答案'}, {t:'普通', n:'【地形地貌辨认】', e:'看到图片就能认出是哪种地形地貌'},
+        {t:'普通', n:'【地理计算·精准】', e:'时区计算、距离计算等毫无压力'}, {t:'普通', n:'【环保意识强烈】', e:'从地理角度分析环保问题，提出建议'}, {t:'普通', n:'【旅游知识丰富】', e:'虽未去过很多地方，但知识储备丰富'},
+        {t:'普通', n:'【地理模型制作】', e:'用泥沙制作地形模型，栩栩如生'}, {t:'普通', n:'【地理老师小百科】', e:'老师忘记某个数据时，她能补充'}, {t:'普通', n:'【地理笔记·图文】', e:'地理笔记图文并茂，像科普书'},
+        {t:'普通', n:'【地理趣味记忆法】', e:'用趣味方法记忆地理知识，分享同学'}, {t:'普通', n:'【经纬定位】', e:'看到坐标立马定位城市'},
+        {t:'强力', n:'【地理综合题·满分】', e:'地理综合题答题全面，总是满分'}, {t:'强力', n:'【地图记忆·一眼万年】', e:'看一眼地图就永久记住所有细节'},
+        {t:'终极', n:'〖地球视角·宏观洞察〗', e:'切换为上帝视角观察地理问题，洞察本质'},
+        {t:'普通', n:'【生物结构·精细记忆】', e:'记住细胞结构、人体器官等所有细节'}, {t:'普通', n:'【生物分类学大师】', e:'动植物分类门纲目科属种记得清清楚楚'}, {t:'普通', n:'【实验观察·显微镜】', e:'显微镜操作熟练，总能找到最佳视野'},
+        {t:'普通', n:'【生物绘图·艺术】', e:'生物绘图精细美观，标注清晰'}, {t:'普通', n:'【生命科学爱好者】', e:'对生命现象充满好奇，常问为什么'}, {t:'普通', n:'【生物与健康】', e:'用生物学知识解释健康问题，提醒同学'},
+        {t:'普通', n:'【生物选择题·全对】', e:'生物选择题正确率接近100%'}, {t:'普通', n:'【生态系统理解深】', e:'理解生态系统各成分相互关系'}, {t:'普通', n:'【遗传规律·精通】', e:'遗传题解题迅速，各种交叉都会'},
+        {t:'普通', n:'【进化论支持者】', e:'能用进化论解释生物现象'}, {t:'普通', n:'【生物老师好帮手】', e:'帮老师准备生物实验材料'}, {t:'普通', n:'【生物课外阅读广】', e:'读很多生物学科普书籍，知识面广'},
+        {t:'普通', n:'【生物笔记·详细】', e:'生物笔记极其详细，包括老师拓展内容'}, {t:'普通', n:'【生物模型制作】', e:'用黏土制作细胞模型，各细胞器分明'}, {t:'普通', n:'【生物术语·准确】', e:'使用生物术语准确，从不混淆'},
+        {t:'普通', n:'【保护生物多样性】', e:'关注生物多样性，做相关主题演讲'}, {t:'普通', n:'【植物养护】', e:'照顾班级植物，长势喜人'},
+        {t:'强力', n:'【复杂遗传题·秒解】', e:'多对基因遗传题瞬间理清思路'}, {t:'强力', n:'【实验设计·严谨】', e:'设计生物学实验严谨科学，变量控制好'},
+        {t:'终极', n:'〖生命感知·微观世界〗', e:'短暂感知微观生命活动，理解更直观'},
+        {t:'普通', n:'【政治术语·精准】', e:'政治术语使用准确，答题规范'}, {t:'普通', n:'【时事政治·全关注】', e:'每天看新闻，了解国内外大事'}, {t:'普通', n:'【政治大题·要点全】', e:'政治大题答题要点全面，不漏分'},
+        {t:'普通', n:'【理论联系实际】', e:'用政治理论分析实际问题，有深度'}, {t:'普通', n:'【选择题·排除法大师】', e:'政治选择题用排除法又快又准'}, {t:'普通', n:'【政治背诵·高效】', e:'政治背诵内容整理成体系，记忆快'},
+        {t:'普通', n:'【辩论赛·政治组】', e:'政治类辩论赛表现出色，逻辑强'}, {t:'普通', n:'【政策理解·深刻】', e:'理解国家政策背后的原理和意义'}, {t:'普通', n:'【政治笔记·条理】', e:'政治笔记条理清晰，分点明确'},
+        {t:'普通', n:'【关心社会热点】', e:'对社会热点有自己的政治角度分析'}, {t:'普通', n:'【政治老师欣赏】', e:'政治老师欣赏其思辨能力'}, {t:'普通', n:'【政治与生活】', e:'将政治知识应用于理解社会生活'},
+        {t:'普通', n:'【政治错题·少】', e:'政治考试错题少，概念清晰'}, {t:'普通', n:'【政治复习·系统】', e:'政治复习系统全面，不遗漏知识点'}, {t:'普通', n:'【政治小组讨论主导】', e:'政治课小组讨论中常主导方向'},
+        {t:'普通', n:'【政治答题卡·整洁】', e:'政治答题卡卷面整洁，分点清楚'}, {t:'普通', n:'【法律意识】', e:'知法懂法，遵纪守法'},
+        {t:'强力', n:'【时政分析·专业】', e:'分析时政问题角度专业，像评论员'}, {t:'强力', n:'【政治大题·满分结构】', e:'政治大题答题结构完美，要点齐全'},
+        {t:'终极', n:'〖政治思维·宏观视角〗', e:'用宏观政治思维分析问题，格局打开'},
+        {t:'普通', n:'【信息技术·操作快】', e:'电脑操作熟练，打字速度全班最快'}, {t:'普通', n:'【编程小能手】', e:'会简单编程，能做小程序解决学习问题'}, {t:'普通', n:'【PPT大师】', e:'做的PPT美观又实用，被各科老师借用'},
+        {t:'普通', n:'【信息检索专家】', e:'快速在网上找到需要的学习资料'}, {t:'普通', n:'【电脑问题解决者】', e:'帮助老师同学解决电脑小问题'}, {t:'普通', n:'【数据分析入门】', e:'用Excel分析成绩数据，找出规律'},
+        {t:'普通', n:'【信息技术课代表】', e:'信息技术课总是第一个完成作业'}, {t:'普通', n:'【网络安全意识】', e:'注意网络安全，不随便点链接'}, {t:'普通', n:'【数字工具探索】', e:'尝试各种学习类APP，推荐给同学'},
+        {t:'普通', n:'【信息课帮同学】', e:'信息课上帮助操作慢的同学'}, {t:'普通', n:'【打字盲打高手】', e:'盲打速度惊人，眼睛不看键盘'}, {t:'普通', n:'【文件管理大师】', e:'电脑文件分类管理清晰，查找迅速'},
+        {t:'普通', n:'【多媒体作品优秀】', e:'多媒体作品制作精良，获校级奖'}, {t:'普通', n:'【信息技术竞赛】', e:'参加信息技术竞赛，获得好成绩'}, {t:'普通', n:'【线上学习适应快】', e:'线上学习期间适应最快，效率高'},
+        {t:'普通', n:'【科技新闻关注】', e:'关注科技新闻，了解最新技术'}, {t:'普通', n:'【硬件知识】', e:'了解电脑硬件，能装机'},
+        {t:'强力', n:'【编程解决学习问题】', e:'编小程序帮助学习，如背单词软件'}, {t:'强力', n:'【数据分析·学习优化】', e:'分析自己学习数据，找到优化方案'},
+        {t:'终极', n:'〖数字思维·高效学习〗', e:'进入数字思维模式，学习效率倍增'},
+        {t:'普通', n:'【美术课·全神贯注】', e:'美术课上最专注，作品总是优秀'}, {t:'普通', n:'【黑板报主力】', e:'每次黑板报都担任主画，设计精美'}, {t:'普通', n:'【手抄报达人】', e:'各科手抄报作业都是范例'},
+        {t:'普通', n:'【笔记插图生动】', e:'笔记里画满小插图帮助理解记忆'}, {t:'普通', n:'【图形记忆强】', e:'通过图形记忆知识，效果更好'}, {t:'普通', n:'【色彩搭配天赋】', e:'色彩搭配和谐，审美在线'},
+        {t:'普通', n:'【美术作业提前】', e:'美术作业总是提前完成且质量高'}, {t:'普通', n:'【教室装饰贡献】', e:'为教室装饰出谋划策，动手制作'}, {t:'普通', n:'【美术老师喜爱】', e:'美术老师经常表扬其创意和技巧'},
+        {t:'普通', n:'【表情包画家】', e:'为班级画专属表情包，逗乐大家'}, {t:'普通', n:'【漫画学历史】', e:'把历史事件画成漫画，便于记忆'}, {t:'普通', n:'【科学图解精确】', e:'画科学图解精确美观，堪比教科书'},
+        {t:'普通', n:'【美术用品齐全】', e:'美术用品齐全，还常借给同学'}, {t:'普通', n:'【艺术字高手】', e:'写艺术字漂亮，用于海报标题'}, {t:'普通', n:'【审美在线】', e:'审美水平高，给同学穿搭建议'},
+        {t:'普通', n:'【手工制作巧手】', e:'手工课作品精巧，常被展览'}, {t:'普通', n:'【观察力敏锐】', e:'发现生活中的美'},
+        {t:'强力', n:'【视觉化学习·高效】', e:'将任何知识视觉化，记忆效率翻倍'}, {t:'强力', n:'【创意设计·源源不断】', e:'创意设计想法不断，总让人惊喜'},
+        {t:'终极', n:'〖艺术思维·创造力爆发〗', e:'艺术思维爆发，创造性解决学习问题'},
+        {t:'普通', n:'【音乐课·音准之王】', e:'音乐课音准最好，老师让示范'}, {t:'普通', n:'【乐器小能手】', e:'会一种以上乐器，演奏打动人心'}, {t:'普通', n:'【合唱团领唱】', e:'合唱团担任领唱，声音清澈'},
+        {t:'普通', n:'【节奏感超强】', e:'节奏感强，音乐课打节拍从不出错'}, {t:'普通', n:'【音乐记忆好】', e:'听一遍旋律就能记住并哼唱'}, {t:'普通', n:'【用音乐助学习】', e:'创作学习内容的歌曲，帮助记忆'},
+        {t:'普通', n:'【课间音乐分享】', e:'课间分享好音乐，调节班级气氛'}, {t:'普通', n:'【音乐鉴赏力】', e:'音乐鉴赏课发言专业，有见解'}, {t:'普通', n:'【音乐老师关注】', e:'音乐老师关注其发展，给予指导'},
+        {t:'普通', n:'【班级文艺活动】', e:'班级文艺活动积极组织参与'}, {t:'普通', n:'【音乐与情绪】', e:'用音乐调节自己学习情绪'}, {t:'普通', n:'【音乐知识丰富】', e:'了解各种音乐类型和音乐家'},
+        {t:'普通', n:'【音乐作业认真】', e:'音乐作业认真完成，如音乐赏析'}, {t:'普通', n:'【音乐创作尝试】', e:'尝试创作简单的旋律'}, {t:'普通', n:'【音乐帮助记忆】', e:'用旋律记忆知识点，效果显著'},
+        {t:'普通', n:'【音乐分享同学】', e:'分享学习用的音乐给同学'}, {t:'普通', n:'【歌词记忆】', e:'歌词记得比课文还快'},
+        {t:'强力', n:'【绝对音感·辅助学习】', e:'用绝对音感辅助记忆，如将知识点编码为旋律'}, {t:'强力', n:'【音乐创作·学习主题】', e:'创作学习主题歌曲，全班传唱'},
+        {t:'终极', n:'〖音乐共鸣·学习状态优化〗', e:'播放特定音乐优化全班学习状态'},
+        {t:'普通', n:'【体育课·全能选手】', e:'体育课各项运动表现优秀'}, {t:'普通', n:'【运动会夺金点】', e:'运动会上为班级夺得多枚金牌'}, {t:'普通', n:'【课间活跃分子】', e:'课间积极活动，不打闹但充满活力'},
+        {t:'普通', n:'【体育精神佳】', e:'体育精神好，尊重对手，团队合作'}, {t:'普通', n:'【带领同学锻炼】', e:'带领同学课间锻炼，如跳绳、跑步'}, {t:'普通', n:'【体育知识丰富】', e:'了解各项运动规则和技巧'},
+        {t:'普通', n:'【体育作业认真】', e:'体育作业如每天锻炼认真完成'}, {t:'普通', n:'【健康生活方式】', e:'倡导健康生活方式，饮食运动结合'}, {t:'普通', n:'【体育老师助手】', e:'帮助体育老师整队、拿器材'},
+        {t:'普通', n:'【运动后学习高效】', e:'适量运动后学习效率更高'}, {t:'普通', n:'【体育与学习平衡】', e:'平衡体育和学习，两者都优秀'}, {t:'普通', n:'【运动会组织】', e:'积极参与运动会组织工作'},
+        {t:'普通', n:'【体育比赛心理强】', e:'体育比赛心理素质好，发挥稳定'}, {t:'普通', n:'【运动安全注意】', e:'运动中注意安全，并提醒同学'}, {t:'普通', n:'【体育榜样】', e:'成为同学体育方面的榜样'},
+        {t:'普通', n:'【体育带动学习】', e:'用体育精神激励学习，不怕困难'}, {t:'普通', n:'【反应速度快】', e:'在学习中反应也很快'},
+        {t:'强力', n:'【运动恢复·快速】', e:'运动后快速恢复精力，不影响学习'}, {t:'强力', n:'【体育技能迁移】', e:'将体育技能如坚持、协作迁移到学习'},
+        {t:'终极', n:'〖体育精神·毅力爆发〗', e:'将体育毅力用于学习，攻克难关'},
+        {t:'普通', n:'【劳动课·积极】', e:'劳动课最积极，不怕脏不怕累'}, {t:'普通', n:'【大扫除主力】', e:'大扫除时承担最累的活，毫无怨言'}, {t:'普通', n:'【教室保洁卫士】', e:'平时注意保持教室整洁，捡起垃圾'},
+        {t:'普通', n:'【劳动技能多】', e:'会多种劳动技能，如修理简单物品'}, {t:'普通', n:'【劳动作业创意】', e:'劳动作业有创意，如废物利用制作'}, {t:'普通', n:'【劳动课代表】', e:'劳动课代表，认真负责'},
+        {t:'普通', n:'【帮助同学劳动】', e:'帮助同学完成劳动任务'}, {t:'普通', n:'【劳动与学习结合】', e:'认为劳动也是学习，培养责任感'}, {t:'普通', n:'【劳动老师表扬】', e:'劳动老师经常表扬其态度和成果'},
+        {t:'普通', n:'【班级劳动组织】', e:'组织班级劳动，分工合理'}, {t:'普通', n:'【劳动工具爱护】', e:'爱护劳动工具，使用后清理归还'}, {t:'普通', n:'【家务劳动好手】', e:'在家也常做家务，是父母好帮手'},
+        {t:'普通', n:'【劳动中学习】', e:'从劳动中学到知识，如植物种植'}, {t:'普通', n:'【劳动成果分享】', e:'分享劳动成果，如自己种的小植物'}, {t:'普通', n:'【劳动精神】', e:'具有吃苦耐劳的劳动精神'},
+        {t:'普通', n:'【劳动榜样】', e:'是同学的劳动榜样'}, {t:'普通', n:'【手巧】', e:'做手工也很棒'},
+        {t:'强力', n:'【高效劳动·时间管理】', e:'劳动中高效时间管理，快速高质量完成'}, {t:'强力', n:'【劳动技能迁移】', e:'将劳动技能如细心、规划迁移到学习'},
+        {t:'终极', n:'〖劳动创造·实践出真知〗', e:'通过劳动实践深刻理解书本知识'},
+        {t:'普通', n:'【心理健康课代表】', e:'心理健康课积极，善于调节情绪'}, {t:'普通', n:'【情绪稳定器】', e:'自己情绪稳定，还能安抚同学'}, {t:'普通', n:'【压力管理好】', e:'面对考试压力能有效管理'},
+        {t:'普通', n:'【积极心态】', e:'总是保持积极心态，乐观向上'}, {t:'普通', n:'【心理知识应用】', e:'应用心理知识帮助学习，如记忆规律'}, {t:'普通', n:'【心理咨询室常客】', e:'主动去心理咨询室了解知识，帮助同学'},
+        {t:'普通', n:'【心理作业认真】', e:'心理健康作业认真完成，如情绪日记'}, {t:'普通', n:'【心理老师信任】', e:'心理老师信任，让其帮助需要同学'}, {t:'普通', n:'【班级心理委员】', e:'担任班级心理委员，关注同学心理'},
+        {t:'普通', n:'【心理书籍阅读】', e:'阅读心理书籍，知识丰富'}, {t:'普通', n:'【学习动机强】', e:'学习动机强，有明确目标'}, {t:'普通', n:'【挫折应对强】', e:'面对学习挫折能积极应对，不气馁'},
+        {t:'普通', n:'【人际关系好】', e:'与同学老师关系融洽，沟通顺畅'}, {t:'普通', n:'【自我认知清晰】', e:'自我认知清晰，知道优缺点'}, {t:'普通', n:'【心理放松技巧】', e:'掌握心理放松技巧，如深呼吸'},
+        {t:'普通', n:'【助人为乐】', e:'乐于帮助同学解决心理困扰'}, {t:'普通', n:'【同理心强】', e:'能理解他人感受'},
+        {t:'强力', n:'【情绪调节·快速】', e:'快速调节不良情绪，恢复学习状态'}, {t:'强力', n:'【压力转化·动力】', e:'将压力转化为学习动力，效率提升'},
+        {t:'终极', n:'〖心理韧性·逆境成长〗', e:'面对逆境心理韧性极强，促进成长'},
+        {t:'普通', n:'【科学课·好奇心强】', e:'科学课提问最多，好奇心驱动力'}, {t:'普通', n:'【科学实验爱好者】', e:'热爱科学实验，课内外都尝试'}, {t:'普通', n:'【科学阅读广泛】', e:'阅读大量科普书籍，知识渊博'},
+        {t:'普通', n:'【科学小制作】', e:'制作科学小制作，如太阳能小车'}, {t:'普通', n:'【科学课代表】', e:'科学课代表，带领同学探索'}, {t:'普通', n:'【科学老师欣赏】', e:'科学老师欣赏其探索精神'},
+        {t:'普通', n:'【科学竞赛参与】', e:'参加科学竞赛，取得好成绩'}, {t:'普通', n:'【科学方法应用】', e:'应用科学方法如观察、实验于学习'}, {t:'普通', n:'【科学态度严谨】', e:'科学态度严谨，尊重事实'},
+        {t:'普通', n:'【科学分享同学】', e:'分享科学知识给同学，激发兴趣'}, {t:'普通', n:'【科学与技术结合】', e:'关注科学与技术结合，如人工智能'}, {t:'普通', n:'【科学幻想合理】', e:'科学幻想基于科学原理，合理有趣'},
+        {t:'普通', n:'【科学笔记详细】', e:'科学笔记详细，包括拓展知识'}, {t:'普通', n:'【科学调查实践】', e:'进行科学调查实践，如校园植物调查'}, {t:'普通', n:'【科学精神】', e:'具有质疑、探索、创新的科学精神'},
+        {t:'普通', n:'【科学榜样】', e:'是同学的科学榜样'}, {t:'普通', n:'【观察入微】', e:'发现别人没注意的细节'},
+        {t:'强力', n:'【跨学科科学思维】', e:'用科学思维解决各学科问题'}, {t:'强力', n:'【实验设计·创新】', e:'设计创新性科学实验，验证假设'},
+        {t:'终极', n:'〖科学探索·真理追求〗', e:'进入深度科学探索状态，追求真理'},
+        {t:'普通', n:'【团队合作领袖】', e:'小组学习中自然成为领袖，协调各方'}, {t:'普通', n:'【合作学习倡导者】', e:'倡导合作学习，认为1+1>2'}, {t:'普通', n:'【分工协调大师】', e:'小组任务分工合理，发挥每人特长'},
+        {t:'普通', n:'【团队凝聚力强】', e:'增强团队凝聚力，使小组成员团结'}, {t:'普通', n:'【合作作业高质量】', e:'合作完成的作业质量高，获老师表扬'}, {t:'普通', n:'【解决团队冲突】', e:'能妥善解决团队内冲突，达成共识'},
+        {t:'普通', n:'【团队目标明确】', e:'为团队设定明确目标，并带领实现'}, {t:'普通', n:'【团队精神传播】', e:'传播团队精神，影响全班'}, {t:'普通', n:'【团队学习效率高】', e:'团队学习效率高于个人学习'},
+        {t:'普通', n:'【团队成果分享】', e:'乐于分享团队成果和经验'}, {t:'普通', n:'【团队与个人平衡】', e:'平衡团队需求和个人需求'}, {t:'普通', n:'【团队建设活动】', e:'组织团队建设活动，增进默契'},
+        {t:'普通', n:'【团队反馈接受】', e:'接受团队反馈，不断改进'}, {t:'普通', n:'【团队荣誉感强】', e:'团队荣誉感强，为团队争光'}, {t:'普通', n:'【团队合作技巧】', e:'掌握多种团队合作技巧'},
+        {t:'普通', n:'【团队榜样】', e:'是班级团队合作的榜样'}, {t:'普通', n:'【倾听者】', e:'善于倾听队员意见'},
+        {t:'强力', n:'【团队激励·潜力激发】', e:'激励团队成员，激发潜力'}, {t:'强力', n:'【团队决策·高效】', e:'团队决策高效，达成最佳方案'},
+        {t:'终极', n:'〖团队领域·协同增效〗', e:'展开团队领域，团队协同效果翻倍'},
+        {t:'普通', n:'【阅读课·书虫】', e:'阅读课总是沉浸在书海中'}, {t:'普通', n:'【阅读速度惊人】', e:'阅读速度快，且理解深刻'}, {t:'普通', n:'【阅读范围广】', e:'阅读范围广，文学、历史、科学都涉猎'},
+        {t:'普通', n:'【阅读笔记认真】', e:'做阅读笔记，摘抄好词好句写感想'}, {t:'普通', n:'【阅读分享积极】', e:'积极分享阅读心得，推荐好书'}, {t:'普通', n:'【阅读与写作】', e:'阅读促进写作，作文引经据典'},
+        {t:'普通', n:'【图书馆常客】', e:'经常去图书馆借书，是VIP'}, {t:'普通', n:'【阅读课代表】', e:'阅读课代表，组织阅读活动'}, {t:'普通', n:'【阅读理解力强】', e:'阅读理解力强，能把握深层含义'},
+        {t:'普通', n:'【阅读帮助学习】', e:'通过阅读拓展知识，帮助各科学习'}, {t:'普通', n:'【阅读习惯好】', e:'每天固定时间阅读，雷打不动'}, {t:'普通', n:'【阅读环境创造】', e:'创造良好的阅读环境，影响同学'},
+        {t:'普通', n:'【阅读与思考】', e:'阅读后深入思考，形成自己观点'}, {t:'普通', n:'【阅读资源推荐】', e:'为同学推荐适合的阅读资源'}, {t:'普通', n:'【阅读榜样】', e:'是同学的阅读榜样'},
+        {t:'普通', n:'【阅读兴趣浓厚】', e:'对阅读有浓厚兴趣，乐在其中'}, {t:'普通', n:'【诵读优美】', e:'朗读课文声音优美'},
+        {t:'强力', n:'【快速阅读·理解不减】', e:'快速阅读且理解力不降，效率倍增'}, {t:'强力', n:'【阅读迁移·知识融合】', e:'将阅读所得知识迁移融合，形成体系'},
+        {t:'终极', n:'〖深度阅读·智慧汲取〗', e:'进入深度阅读状态，汲取书籍智慧'},
+        {t:'普通', n:'【计划制定大师】', e:'制定详细学习计划，并严格执行'}, {t:'普通', n:'【目标设定合理】', e:'设定合理学习目标，既有挑战又可达成'}, {t:'普通', n:'【时间管理精细】', e:'时间管理精细到每半小时'},
+        {t:'普通', n:'【优先级判断准】', e:'准确判断任务优先级，先做重要的'}, {t:'普通', n:'【计划调整灵活】', e:'根据情况灵活调整计划，不僵化'}, {t:'普通', n:'【计划完成率高】', e:'计划完成率高，自律性强'},
+        {t:'普通', n:'【计划工具使用】', e:'使用各种计划工具，如日程本、APP'}, {t:'普通', n:'【计划分享同学】', e:'分享计划制定经验给同学'}, {t:'普通', n:'【长期计划与短期】', e:'兼顾长期计划和短期计划'},
+        {t:'普通', n:'【计划回顾总结】', e:'定期回顾总结计划执行情况，改进'}, {t:'普通', n:'【计划与习惯】', e:'通过计划培养良好学习习惯'}, {t:'普通', n:'【计划激励自己】', e:'用计划激励自己，有成就感'},
+        {t:'普通', n:'【计划帮助同学】', e:'帮助同学制定计划，提高效率'}, {t:'普通', n:'【计划榜样】', e:'是同学计划管理的榜样'}, {t:'普通', n:'【计划与放松】', e:'计划中包含放松时间，劳逸结合'},
+        {t:'普通', n:'【计划执行力强】', e:'计划执行力强，不拖延'}, {t:'普通', n:'【专注力】', e:'执行计划时非常专注'},
+        {t:'强力', n:'【多任务并行管理】', e:'同时管理多个学习任务，互不干扰'}, {t:'强力', n:'【计划优化·持续改进】', e:'持续优化计划，找到最适合自己的'},
+        {t:'终极', n:'〖完美计划·目标必达〗', e:'制定完美计划，确保目标必定达成'}
+    ];
+
+    // === 2. 全局技能池 ===
+    let globalNormal = [];
+    let globalStrong = [];
+    let globalUltimate = [];
+
+    rawData.forEach(s => {
+        if(s.t === '普通') globalNormal.push(s);
+        else if(s.t === '强力') globalStrong.push(s);
+        else if(s.t === '终极') globalUltimate.push(s);
+    });
+
+    // 随机头像
+    const randomEmojis = ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🐤","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐜","🦟","🦗","🕷","🦂","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦐","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐕‍🦺","🐈","🐈‍⬛","🐓","🦃","🦚","🦜","🦢","🦩","🕊","🐇","🦝","🦨","🦡","🦦","🦥","🐁","🐀","🐿","🦔","🐉","🐲","🌵","🎄","🌲","🌳","🌴","🌱","🌿","☘","🍀","🎍","🎋","🍃","🍂","🍁","🍄","🐚","🌾","💐","🌷","🌹","🥀","🌺","🌸","🌼","🌻","🌞","🌝","🌛","🌜","🌚","🌕","🌖","🌗","🌘","🌑","🌒","🌓","🌔","🌙","🌎","🌍","🌏","🪐","💫","⭐","🌟","✨","⚡","☄","💥","🔥","🌪","🌈","☀","🌤","⛅","🌥","☁","🌦","🌧","⛈","🌩","🌨","❄","☃","⛄","🌬","💨","💧","💦","☔","☂","🌊"];
+
+    // 10 种颜色
+    const macaronColors = [
+        '#a0c4ff', '#ffadad', '#caffbf', '#bdb2ff', '#ffd6a5', 
+        '#fdffb6', '#9bf6ff', '#ffc6ff', '#a0e7e5', '#d4a5a5'
+    ];
+
+    // 学生名单
+    const studentsData = [
+        {name: "柴骅", score: 91}, {name: "陈焕楷", score: 87}, {name: "陈昕泽", score: 114}, {name: "董诗晗", score: 46},
+        {name: "高贝拉", score: 136}, {name: "华静", score: 98}, {name: "黄裕瀚", score: 108}, {name: "金依娴", score: 121},
+        {name: "李晨滢", score: 136}, {name: "倪瑞祁", score: 47}, {name: "沈远", score: 51}, {name: "王炫茸", score: 103},
+        {name: "王子墨", score: 92}, {name: "王子睿", score: 40}, {name: "谢睿彤", score: 60}, {name: "杨依然", score: 93},
+        {name: "叶卓骐", score: 46}, {name: "张昕瑜", score: 136}, {name: "郑熙熙", score: 134}, {name: "周卓宸", score: 6}
+    ];
+
+    // === 3. 游戏状态 ===
+    let fighters = [];
+    let isFighting = false;
+
+    // === 4. 初始化选人 ===
+    const rosterDiv = document.getElementById('roster');
+    studentsData.forEach((s, idx) => {
+        const btn = document.createElement('div');
+        btn.className = 'chip';
+        btn.innerHTML = s.name;
+        btn.onclick = () => toggleSelect(idx, btn);
+        rosterDiv.appendChild(btn);
+    });
+
+    function toggleSelect(idx, el) {
+        if (isFighting) return;
+
+        const s = studentsData[idx];
+        const existingIdx = fighters.findIndex(f => f.name === s.name);
+
+        if(existingIdx > -1) {
+            fighters.splice(existingIdx, 1);
+            el.classList.remove('selected');
+            el.style.backgroundColor = '';
+            el.style.borderColor = '';
+            el.style.color = '';
+        } else {
+            if(fighters.length >= 10) return;
+            fighters.push(s);
+            el.classList.add('selected');
+            
+            const color = macaronColors[fighters.length - 1];
+            el.style.backgroundColor = color;
+            el.style.borderColor = '#fff';
+            el.style.color = '#fff';
+        }
+
+        const btn = document.getElementById('start-btn');
+        if(fighters.length >= 3 && fighters.length <= 10) {
+            btn.disabled = false;
+            btn.innerText = `🍬 START BATTLE (${fighters.length}) 🍬`;
+            btn.classList.remove('restart');
+        } else {
+            btn.disabled = true;
+            btn.innerText = "选 3-10 人开始";
+        }
+    }
+
+    function handleMainBtn() {
+        const btn = document.getElementById('start-btn');
+        if (btn.innerText.includes("再来")) {
+            resetArena();
+        } else {
+            startCombat();
+        }
+    }
+
+    // === 5. 战斗核心 (Battle Royale) ===
+    function getRandomDeck() {
+        const n = globalNormal.sort(() => 0.5 - Math.random()).slice(0, 17);
+        const s = globalStrong.sort(() => 0.5 - Math.random()).slice(0, 2);
+        const u = globalUltimate.sort(() => 0.5 - Math.random()).slice(0, 1);
+        return [...n, ...s, ...u];
+    }
+
+    function renderArena() {
+        const arena = document.getElementById('arena');
+        arena.innerHTML = '';
+        
+        const total = fighters.length;
+        // 圆形布局参数
+        // 假设容器中心是 (50%, 50%)
+        // 半径根据容器大小自适应，css 宽高大概 1000px/600px
+        // 用相对百分比比较安全
+        
+        fighters.forEach((f, i) => {
+            f.hp = 100;
+            f.id = i;
+            f.deck = getRandomDeck();
+            f.emoji = randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
+            f.blockRate = Math.max(1, Math.min(10, Math.floor(f.score / 15)));
+            f.color = macaronColors[i];
+
+            const div = document.createElement('div');
+            div.className = 'fighter';
+            div.setAttribute('data-id', i);
+            div.style.borderColor = f.color;
+            div.innerHTML = `
+                <div class="hp-box">
+                    <div class="hp-bar" style="background:${f.color}"></div>
+                    <div class="hp-text">100</div>
+                </div>
+                <div class="avatar">${f.emoji}</div>
+                <div class="name">${f.name}</div>
+            `;
+            
+            // 计算位置 (Circle Layout)
+            // 角度：从 -90deg (Top) 开始
+            const angle = (i / total) * 2 * Math.PI - (Math.PI / 2);
+            // 半径：40%
+            const r = 42; 
+            const x = 50 + r * Math.cos(angle);
+            const y = 50 + r * Math.sin(angle);
+            
+            div.style.left = `calc(${x}% - 55px)`; // center the card width (110/2)
+            div.style.top = `calc(${y}% - 60px)`; // center the card height
+            
+            // 如果人多，稍微缩小卡片
+            if (total > 6) {
+                div.style.transform = 'scale(0.85)';
+            }
+
+            arena.appendChild(div);
+        });
+
+        // Center Log
+        const log = document.createElement('div');
+        log.className = 'center-stage';
+        if (total > 6) log.style.transform = "translate(-50%, -50%) scale(0.9)";
+        log.innerHTML = `<div class="log-content" id="log-content">大乱斗开始！<br>${total}人混战！</div>`;
+        arena.appendChild(log);
+    }
+
+    async function startCombat() {
+        isFighting = true;
+        const btn = document.getElementById('start-btn');
+        btn.disabled = true;
+        document.querySelector('.roster-area').style.pointerEvents = 'none';
+        document.querySelector('.roster-area').style.opacity = 0.6;
+
+        renderArena();
+        initAudio();
+
+        while (fighters.filter(f => f.hp > 0).length > 1) {
+            const alive = fighters.filter(f => f.hp > 0);
+
+            // --- 随机事件 check ---
+            const rnd = Math.random();
+            if (rnd < 0.08) { // 增加频率
+                await triggerEvent("chase");
+                if (fighters.filter(f => f.hp > 0).length <= 1) break;
+            } else if (rnd < 0.12) { 
+                await triggerEvent("magnet");
+                if (fighters.filter(f => f.hp > 0).length <= 1) break;
+            }
+
+            const attacker = alive[Math.floor(Math.random() * alive.length)];
+            const potentialTargets = alive.filter(f => f !== attacker);
+            if (potentialTargets.length === 0) break;
+            const target = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+
+            // Skill
+            const skill = attacker.deck[Math.floor(Math.random() * attacker.deck.length)];
+            
+            let dmg = 0;
+            let sound = 'happy';
+            let isUlt = false;
+
+            if (skill.t === '普通') { dmg = rand(1, 20); sound = 'happy'; }
+            else if (skill.t === '强力') { dmg = rand(20, 30); sound = 'strong'; }
+            else { dmg = rand(50, 100); isUlt = true; sound = 'ult'; }
+
+            const blocked = Math.random() * 100 < target.blockRate;
+
+            const logContent = document.getElementById('log-content');
+            
+            let html = `
+                <div style="color:${attacker.color}; font-weight:bold; font-size:1.4rem;">${attacker.name}</div>
+                <span class="skill-name" style="font-size:1.1rem;">${skill.n}</span>
+                <div style="font-size:0.9rem; color:#666; margin-bottom:5px;">${skill.e}</div>
+                <div style="font-size:1rem;">➡ 攻击 <span style="color:${target.color}; font-weight:bold;">${target.name}</span></div>
+            `;
+            logContent.innerHTML = html;
+
+            const atkEl = document.querySelector(`.fighter[data-id="${attacker.id}"]`);
+            atkEl.style.zIndex = 100;
+            atkEl.style.transform = `scale(1.2)`; // 攻击者放大提示
+            await wait(200);
+            atkEl.style.transform = fighters.length > 6 ? 'scale(0.85)' : 'scale(1)';
+            atkEl.style.zIndex = 10;
+
+            if(isUlt) triggerFlash();
+
+            if (blocked) {
+                logContent.innerHTML += `<div style="color:#aaa; margin-top:5px; font-weight:bold;">🛡️ 被挡下了!</div>`;
+                playTone('block');
+            } else {
+                playTone(sound);
+                spawnParticles(target.id);
+                
+                target.hp -= dmg;
+                updateHP(target.id, target.hp);
+
+                const defEl = document.querySelector(`.fighter[data-id="${target.id}"]`);
+                defEl.style.animation = 'shake 0.4s';
+                setTimeout(()=>defEl.style.animation='', 400);
+
+                logContent.innerHTML += `<span class="dmg">-${dmg}</span>`;
+            }
+
+            if (target.hp <= 0) {
+                target.hp = 0;
+                const deadEl = document.querySelector(`.fighter[data-id="${target.id}"]`);
+                deadEl.classList.add('dead');
+                // 掉落动画
+                playTone('lose'); 
+                logContent.innerHTML += `<div style="color:var(--text); font-weight:bold; margin-top:5px;">💀 ${target.name} 出局!</div>`;
+                await wait(1000);
+            }
+
+            await wait(1500);
+        }
+
+        endGame();
+    }
+
+    async function triggerEvent(type) {
+        if (type === 'chase') {
+            playTone('chase');
+            const events = [
+                {msg: "CHASE 问：你单词过了！", val: -10},
+                {msg: "CHASE 问：你校裤呢？", val: -10},
+                {msg: "CHASE 问：39分才进校？", val: -10},
+                {msg: "CHASE 问：你是不是吃了两份？", val: -15},
+                {msg: "CHASE 问：反思呢？", val: -10},
+                {msg: "CHASE 扔出了奶茶！(全员+20)", val: 20}
+            ];
+            const ev = events[Math.floor(Math.random()*events.length)];
+            
+            const overlay = document.createElement('div');
+            overlay.className = ev.val > 0 ? 'chase-smash smash-heal' : 'chase-smash smash-dmg';
+            overlay.innerHTML = `⚠️ ${ev.msg}`;
+            // 随机位置
+            overlay.style.top = (30 + Math.random()*40) + '%';
+            overlay.style.left = (30 + Math.random()*40) + '%';
+            overlay.style.transform = `translate(-50%, -50%) rotate(${Math.random()*20-10}deg)`;
+            
+            document.body.appendChild(overlay);
+
+            fighters.forEach(f => {
+                if (f.hp > 0) {
+                    f.hp += ev.val;
+                    if(f.hp > 100) f.hp = 100;
+                    if(f.hp <= 0) {
+                        f.hp = 0;
+                        document.querySelector(`.fighter[data-id="${f.id}"]`).classList.add('dead');
+                    }
+                    updateHP(f.id, f.hp);
+                }
+            });
+            await wait(2000);
+            overlay.remove();
+
+        } else {
+            playTone('block'); 
+            const overlay = document.createElement('div');
+            overlay.className = 'chase-smash smash-dmg'; 
+            overlay.style.background = '#a0c4ff';
+            overlay.innerHTML = `🧲 灾害-丢磁铁<br>全员扣 10 HP!`;
+            overlay.style.top = '50%'; overlay.style.left = '50%';
+            overlay.style.transform = `translate(-50%, -50%) rotate(${Math.random()*20-10}deg)`;
+            document.body.appendChild(overlay);
+
+            fighters.forEach(f => {
+                if (f.hp > 0) {
+                    f.hp -= 10;
+                    if(f.hp <= 0) {
+                        f.hp = 0;
+                        document.querySelector(`.fighter[data-id="${f.id}"]`).classList.add('dead');
+                    }
+                    updateHP(f.id, f.hp);
+                }
+            });
+            await wait(2000);
+            overlay.remove();
+        }
+    }
+
+    function updateHP(id, val) {
+        if (val < 0) val = 0;
+        const el = document.querySelector(`.fighter[data-id="${id}"]`);
+        el.querySelector('.hp-bar').style.width = val + '%';
+        el.querySelector('.hp-text').innerText = val;
+    }
+
+    function triggerFlash() {
+        const el = document.getElementById('flash');
+        el.className = 'flash-anim';
+        setTimeout(() => el.className = '', 1500);
+    }
+
+    function spawnParticles(targetId) {
+        const card = document.querySelector(`.fighter[data-id="${targetId}"]`);
+        if(!card) return;
+        const rect = card.getBoundingClientRect();
+        const cx = rect.left + rect.width/2;
+        const cy = rect.top + rect.height/2;
+        
+        const symbols = ["💦", "💕"];
+        for(let i=0; i<6; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.innerText = symbols[rand(0,1)];
+            p.style.left = (cx + rand(-40, 40)) + 'px';
+            p.style.top = (cy + rand(-40, 40)) + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1000);
+        }
+    }
+
+    function endGame() {
+        isFighting = false;
+        const btn = document.getElementById('start-btn');
+        const log = document.getElementById('log-content');
+        
+        const survivor = fighters.find(f => f.hp > 0);
+        
+        if (survivor) {
+            log.innerHTML = `<div style="color:var(--accent); font-size:2rem; font-weight:bold; text-shadow:2px 2px 0 #ccc;">🏆 ${survivor.name} 最终获胜!</div>`;
+            playBGM('win');
+        } else {
+            log.innerHTML = `<div style="color:var(--text); font-size:2rem;">无人生还...</div>`;
+            playBGM('lose');
+        }
+
+        btn.disabled = false;
+        btn.innerText = "🔄 再来一局 (重置)";
+        btn.classList.add('restart');
+        
+        document.querySelector('.roster-area').style.pointerEvents = 'auto';
+        document.querySelector('.roster-area').style.opacity = 1;
+    }
+
+    function resetGame() {
+        document.getElementById('chase-modal').style.display = 'none';
+        fighters = [];
+        document.querySelectorAll('.chip').forEach(c => {
+            c.classList.remove('selected');
+            c.style.backgroundColor = '';
+            c.style.borderColor = '';
+            c.style.color = '';
+        });
+
+        const arena = document.getElementById('arena');
+        arena.innerHTML = `<div class="center-stage"><div class="log-content" id="log-content">选择 3-10 名同学<br>开启大乱斗！</div></div>`;
+
+        const btn = document.getElementById('start-btn');
+        btn.innerText = "选 3-10 人开始";
+        btn.disabled = true;
+        btn.classList.remove('restart');
+    }
+
+    function rand(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+    function wait(ms) { return new Promise(r=>setTimeout(r, ms)); }
+
+    // === 音效 ===
+    let ctx;
+    function initAudio() {
+        if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if(ctx.state === 'suspended') ctx.resume();
+    }
+
+    function playTone(type) {
+        if(!ctx) return;
+        const t = ctx.currentTime;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+
+        if(type === 'happy') {
+            const now = t;
+            o.type = 'square'; o.frequency.setValueAtTime(600, now);
+            g.gain.setValueAtTime(0.1, now); g.gain.linearRampToValueAtTime(0, now+0.08);
+            o.start(now); o.stop(now+0.08);
+            
+            const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination);
+            o2.type = 'square'; o2.frequency.setValueAtTime(600, now+0.1);
+            g2.gain.setValueAtTime(0.1, now+0.1); g2.gain.linearRampToValueAtTime(0, now+0.18);
+            o2.start(now+0.1); o2.stop(now+0.18);
+            
+            const o3 = ctx.createOscillator(); const g3 = ctx.createGain(); o3.connect(g3); g3.connect(ctx.destination);
+            o3.type = 'square'; o3.frequency.setValueAtTime(400, now+0.2);
+            g3.gain.setValueAtTime(0.1, now+0.2); g3.gain.linearRampToValueAtTime(0, now+0.3);
+            o3.start(now+0.2); o3.stop(now+0.3);
+            
+            const o4 = ctx.createOscillator(); const g4 = ctx.createGain(); o4.connect(g4); g4.connect(ctx.destination);
+            o4.type = 'triangle'; o4.frequency.setValueAtTime(300, now+0.35);
+            g4.gain.setValueAtTime(0.2, now+0.35); g4.gain.exponentialRampToValueAtTime(0.01, now+0.8);
+            o4.start(now+0.35); o4.stop(now+0.8);
+
+        } else if (type === 'strong') {
+            o.type = 'square';
+            o.frequency.setValueAtTime(150, t);
+            o.frequency.linearRampToValueAtTime(50, t+0.3);
+            g.gain.setValueAtTime(0.2, t);
+            g.gain.linearRampToValueAtTime(0, t+0.3);
+            o.start(t); o.stop(t+0.3);
+        } else if (type === 'ult') {
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(100, t);
+            o.frequency.linearRampToValueAtTime(800, t+0.1); 
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.linearRampToValueAtTime(0, t+1.2);
+            o.start(t); o.stop(t+1.2);
+        } else if (type === 'chase') {
+            o.type = 'sine';
+            o.frequency.setValueAtTime(800, t);
+            o.frequency.linearRampToValueAtTime(400, t+0.3);
+            g.gain.setValueAtTime(0.2, t);
+            o.start(t); o.stop(t+0.3);
+        } else if (type === 'block') {
+            o.type = 'square'; o.frequency.value = 200; g.gain.value = 0.1;
+            o.start(t); o.stop(t+0.1);
+        } else if (type === 'lose') {
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(200, t);
+            o.frequency.linearRampToValueAtTime(50, t+0.5);
+            g.gain.setValueAtTime(0.2, t);
+            g.gain.linearRampToValueAtTime(0, t+0.5);
+            o.start(t); o.stop(t+0.5);
+        }
+    }
+
+    function playBGM(type) {
+        if(!ctx) return;
+        const t = ctx.currentTime;
+        if(type === 'win') {
+            const notes = [523, 659, 783, 1046];
+            for(let i=0; i<40; i++) {
+                let o = ctx.createOscillator();
+                let g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination);
+                o.type = 'square';
+                o.frequency.value = notes[i%4];
+                let st = t+i*0.25;
+                g.gain.setValueAtTime(0.05, st);
+                g.gain.linearRampToValueAtTime(0, st+0.1);
+                o.start(st); o.stop(st+0.1);
+            }
+        } else {
+            let o = ctx.createOscillator();
+            let g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(300, t);
+            o.frequency.linearRampToValueAtTime(50, t+10);
+            g.gain.setValueAtTime(0.2, t);
+            g.gain.linearRampToValueAtTime(0, t+10);
+            o.start(t); o.stop(t+10);
+        }
+    }
+
+</script>
+</body>
+</html>
