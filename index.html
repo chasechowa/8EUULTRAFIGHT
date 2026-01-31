@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍭 ClassDojo: Ultimate Showdown FINAL Rev.7 🍭</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Zcool+KuaiLe&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fff0f5; --text: #5d576b; --card-bg: rgba(255, 255, 255, 0.98); 
+            --accent: #ff9a9e; --header-h: 180px;
+        }
+        body.boss-mode {
+            --bg: #0d0000; --text: #ff3333; --card-bg: rgba(20, 0, 0, 0.95); --accent: #ff0000;
+        }
+        body {
+            background-color: var(--bg); font-family: 'Zcool KuaiLe', sans-serif;
+            color: var(--text); margin: 0; height: 100vh; overflow: hidden; transition: 0.5s;
+            display: flex; flex-direction: column;
+        }
+
+        .top-container {
+            height: var(--header-h); background: var(--card-bg);
+            border-bottom: 5px solid var(--accent); z-index: 5000;
+            display: flex; flex-direction: column; padding: 10px 20px; box-sizing: border-box;
+        }
+        header { display: flex; justify-content: space-between; align-items: center; height: 40px; }
+        .status-box { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .skill-name { font-size: 2.5rem; font-weight: bold; color: var(--accent); line-height: 1.2; }
+        .skill-desc { font-size: 1.5rem; opacity: 0.9; margin-top: 5px; color: #444; }
+        body.boss-mode .skill-desc { color: #ff9999; }
+        .action-msg { font-size: 1.3rem; font-weight: bold; color: #ff6b6b; margin-top: 5px; }
+
+        .arena { flex: 1; position: relative; width: 100%; overflow: hidden; }
+        .fighter {
+            position: absolute; display: flex; flex-direction: column; align-items: center;
+            transition: all 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94); z-index: 10;
+        }
+        .avatar { font-size: 5rem; filter: drop-shadow(0 8px 8px rgba(0,0,0,0.1)); }
+        .hp-box { width: 80px; height: 8px; background: #ddd; border: 1px solid #fff; border-radius: 5px; overflow: hidden; }
+        .hp-fill { height: 100%; width: 100%; background: #caffbf; transition: width 0.2s; }
+        .name-tag { font-size: 0.85rem; background: rgba(255,255,255,0.7); padding: 1px 6px; border-radius: 8px; margin-top: 3px; }
+
+        #boss-entity {
+            position: absolute; top: 22%; left: 50%; transform: translate(-50%, -50%);
+            display: none; flex-direction: column; align-items: center; z-index: 5;
+        }
+        .boss-img { font-size: 12rem; filter: drop-shadow(0 0 30px #f00); transition: 0.2s; }
+
+        #victory-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95); display: none;
+            flex-direction: column; justify-content: center; align-items: center; z-index: 9000;
+        }
+        #victory-screen.horror { background: #000; color: #f00; border: 10px solid #0f0; }
+        #victory-screen.horror #v-name { color: #0f0; text-shadow: 4px 4px #f00; font-family: 'Press Start 2P'; font-size: 1.5rem; }
+
+        .victory-emoji { font-size: 12rem; margin-bottom: 20px; animation: victoryPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite alternate; }
+        @keyframes victoryPop { from { transform: scale(0.9); } to { transform: scale(1.1); } }
+
+        .roster-area {
+            height: 22vh; background: #fff; border-top: 4px solid var(--accent);
+            display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; z-index: 5500;
+        }
+        .roster-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; overflow-y: auto; width: 100%; }
+        .chip { padding: 5px 12px; background: #f5f5f5; border-radius: 15px; cursor: pointer; font-size: 0.8rem; }
+        .chip.selected { background: var(--accent); color: white; }
+        .start-btn {
+            background: var(--accent); color: white; border: none; padding: 12px 50px;
+            font-size: 1.5rem; border-radius: 30px; cursor: pointer; font-family: 'Zcool KuaiLe'; margin-bottom: 8px;
+        }
+        .start-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        @keyframes fall { 100% { transform: translateY(1000px) rotate(720deg) scale(0); opacity: 0; } }
+        .dead { animation: fall 0.8s forwards ease-in; }
+        #flash { position: fixed; top:0; left:0; width:100%; height:100%; background: #fff; pointer-events: none; opacity: 0; z-index: 9999; }
+        .shake-screen { animation: shake 0.1s infinite; }
+        @keyframes shake { 0%,100%{transform:translate(0,0);} 25%{transform:translate(-15px,15px);} 75%{transform:translate(15px,-15px);} }
+    </style>
+</head>
+<body>
+
+<div class="top-container">
+    <header>
+        <h1 id="main-title">🍭 DOJO ROYALE</h1>
+        <button class="mode-btn" onclick="toggleMode()" id="mode-btn">💀 BOSS MODE</button>
+    </header>
+    <div class="status-box">
+        <div class="skill-name" id="ui-skill">就绪</div>
+        <div class="skill-desc" id="ui-desc">请选择选手开启战斗</div>
+        <div class="action-msg" id="ui-msg"></div>
+    </div>
+</div>
+
+<div class="arena" id="arena">
+    <div id="boss-entity">
+        <div class="boss-img" id="boss-emoji">👿</div>
+        <div style="color:red; font-family:'Press Start 2P'; font-size: 0.8rem; margin-top:10px;">CHASE (The Teacher)</div>
+    </div>
+    <div id="victory-screen">
+        <div class="victory-emoji" id="v-emoji"></div>
+        <div id="v-name"></div>
+        <button class="start-btn" onclick="location.reload()">重新开始游戏</button>
+    </div>
+</div>
+
+<div id="flash"></div>
+
+<div class="roster-area">
+    <button class="start-btn" id="start-btn" disabled onclick="startMatch()">开启战斗</button>
+    <div class="roster-grid" id="roster-grid"></div>
+</div>
+
+<script>
+    // 海量 Emoji 库
+    const EMOJI_LIBRARY = ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🐤","🐣","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐜","🦟","🦗","🕷","🦂","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦐","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","😀","😃","😄","😁","😆","😅","😂","🤣","🥲","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🥸","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵‍💫","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👹","👺","🤡","💩","👻","💀","👽","👾","🤖","🎃","👶","👧","🧒","👦"];
+
+    // 核心数据库：20人 x 20技能 (总计400)
+    const RAW_STUDENTS_DATA = [
+        { name: "柴骅", score: 91, skills: [{n:'【早读霸主】', e:'晨读音量增幅300%'}, {n:'【默写全对！】', e:'正确率锁定100%'}, {n:'【作文超时？】', e:'爆肝写出800字高分作文'}, {n:'【注释小抄】', e:'注释浮现在脑海侧边栏'}, {n:'【阅读理解】', e:'精准揣摩出题人意图'}, {n:'【背诵通灵】', e:'课文自动在眼前滚动播放'}, {n:'【错别字退散】', e:'自动修正错别字'}, {n:'【成语连环炮】', e:'连续使用多个成语'}, {n:'【标点强迫症】', e:'修正标点符号错误'}, {n:'【卷面印刷体】', e:'笔迹优化成工整字体'}, {n:'【古诗词召唤】', e:'引用贴切诗句'}, {n:'【答题卡预感】', e:'预感考点位置'}, {n:'【素材本显灵】', e:'素材自动弹出'}, {n:'【时间管理侠】', e:'精确到每分钟'}, {n:'【黑板字复刻】', e:'自动录入笔记'}, {n:'【防偷学无效】', e:'防止同桌偷看思路'}, {n:'【修辞强化】', e:'排比对偶信手拈来'}, {n:'【作文瞬发】', e:'40分钟完成千字作文'}, {n:'【翻译信雅达】', e:'翻译准确且富有文采'}, {n:'〖文心雕龙〗', e:'主观题获得满分倾向'}]},
+        { name: "陈焕楷", score: 87, skills: [{n:'【这题做？】', e:'秒出答案，懒得写过程'}, {n:'【草稿纸艺术】', e:'凌乱中藏着解题思路'}, {n:'【公式默写】', e:'正反推导自如'}, {n:'【几何透视眼】', e:'立体几何自由旋转分解'}, {n:'【应用题翻译】', e:'瞬间转化为数学表达式'}, {n:'【计算器人脑】', e:'心算速度超过按计算器'}, {n:'【辅助线天才】', e:'画出最关键的辅助线'}, {n:'【分类讨论】', e:'自动列出所有可能'}, {n:'【压轴题挑衅】', e:'越难的题越兴奋'}, {n:'【步骤分收割】', e:'拿到90%步骤分'}, {n:'【数学梗王】', e:'逻辑满分'}, {n:'【一题多解秀】', e:'三种以上解法震慑老师'}, {n:'【错题本·薄】', e:'因为错的太少'}, {n:'【时间刺客】', e:'提前30分钟做完检查'}, {n:'【黑板擦争夺】', e:'抢着上黑板解题'}, {n:'【求助热线】', e:'讲题讲到对方真懂'}, {n:'【逻辑闭环】', e:'推导过程无懈可击'}, {n:'【压轴题破译】', e:'破解数学最后一道大题'}, {n:'【数学建模】', e:'转化为数学模型求解'}, {n:'〖数学之神〗', e:'所有题目浮现思路'}]},
+        { name: "陈昕泽", score: 114, skills: [{n:'【超级早到】', e:'永远比值日生早到'}, {n:'【坐姿端正】', e:'腰板挺直的标兵'}, {n:'【笔记配色】', e:'形成个人色码系统'}, {n:'【错题手账】', e:'复习时心情愉悦'}, {n:'【作业全A+】', e:'作业本全班传阅'}, {n:'【课堂点头】', e:'互动感满分'}, {n:'【文具收纳】', e:'笔袋按功能排列整齐'}, {n:'【书包减重】', e:'每天只带必要课本'}, {n:'【水杯提醒】', e:'保持巅峰状态'}, {n:'【眼保健操】', e:'穴位精准被表扬'}, {n:'【值日标兵】', e:'帮别人打扫卫生'}, {n:'【校服整洁】', e:'领子永远平整'}, {n:'【抽屉整理】', e:'5秒内找到任何课本'}, {n:'【礼貌用语】', e:'从不离口的谢谢'}, {n:'【借物及时还】', e:'用完立刻归还文具'}, {n:'【天气预报员】', e:'提醒同桌带伞加衣'}, {n:'【认真听讲】', e:'吸收所有知识点'}, {n:'【全科笔记】', e:'图文并茂的笔记'}, {n:'【作业预测】', e:'提前完成所有任务'}, {n:'〖模范生光环〗', e:'全班学习态度提升'}]},
+        { name: "董诗晗", score: 46, skills: [{n:'【听力全对】', e:'从未错过任何听力题'}, {n:'【单词怪物】', e:'词汇量惊人'}, {n:'【口语模仿】', e:'模仿口音惟妙惟肖'}, {n:'【高级词汇】', e:'全是复杂句型'}, {n:'【语法纠察】', e:'纠正口语错误'}, {n:'【电影字幕】', e:'不需要字幕'}, {n:'【外教聊天】', e:'自如交流哲学'}, {n:'【英语配音】', e:'一人分饰多角'}, {n:'【单词接龙】', e:'从未输过的词汇量'}, {n:'【英文歌王】', e:'课间即兴演唱'}, {n:'【俚语收集】', e:'作文让老师惊艳'}, {n:'【快速阅读】', e:'三分钟读完长文'}, {n:'【辩论MVP】', e:'用词精准逻辑清晰'}, {n:'【翻译信雅达】', e:'保留原文韵味'}, {n:'【英语角主持】', e:'带动全班口语练习'}, {n:'【英文书法】', e:'书写如印刷体'}, {n:'【语感超强】', e:'凭直觉选对所有题'}, {n:'【同声传译】', e:'自动同步翻译讲课'}, {n:'【单词记忆】', e:'看一遍就永久记住'}, {n:'〖英语思维〗', e:'英语水平瞬间翻倍'}]},
+        { name: "高贝拉", score: 136, skills: [{n:'【实验成功】', e:'物理实验操作精准'}, {n:'【公式推导】', e:'必须推导一遍逻辑'}, {n:'【生活物理】', e:'解释一切物理现象'}, {n:'【电路图画家】', e:'画图又快又准'}, {n:'【受力分析】', e:'三秒完成分析'}, {n:'【物理梗】', e:'密度编段子冷翻全场'}, {n:'【单位换算】', e:'瞬间完成换算'}, {n:'【报告范文】', e:'被老师当模板传阅'}, {n:'【模型搭建】', e:'搭建物理实验模型'}, {n:'【难题收集】', e:'形成高难度题库'}, {n:'【老师助手】', e:'熟悉每样物理设备'}, {n:'【竞赛种子】', e:'轻松入围准备省奖'}, {n:'【阿基米德】', e:'洗澡时想到浮力'}, {n:'【能量守恒】', e:'消耗能量变知识'}, {n:'【错题本薄】', e:'逻辑无懈可击'}, {n:'【黑板画图】', e:'画图赢得全班掌声'}, {n:'【物理直觉】', e:'洞察物理本质'}, {n:'【复杂心算】', e:'无需草稿纸的计算'}, {n:'【实验创新】', e:'设计创新性实验'}, {n:'〖物理法则〗', e:'微调局部物理规则'}]},
+        { name: "华静", score: 98, skills: [{n:'【配平高手】', e:'瞬间配平复杂方程式'}, {n:'【周期表倒背】', e:'包括原子量也记得'}, {n:'【实验零失误】', e:'操作极其规范'}, {n:'【颜色记忆】', e:'记住所有反应颜色'}, {n:'【化学式猜谜】', e:'一猜就中'}, {n:'【有毒物知晓】', e:'提醒同学实验安全'}, {n:'【乙酸乙酯】', e:'散发迷人的香味'}, {n:'【分子模型】', e:'球棍模型搭得快'}, {n:'【计算精准】', e:'从不丢计算分'}, {n:'【现象预言】', e:'预测完全一致'}, {n:'【化学史】', e:'熟悉化学背后的故事'}, {n:'【药品整理】', e:'药品柜井井有条'}, {n:'【趣味实验】', e:'吸引全班围观'}, {n:'【化学生活】', e:'讲解生活中的应用'}, {n:'【彩色笔记】', e:'标注不同类别知识'}, {n:'【得意门生】', e:'老师提问稳操胜券'}, {n:'【试管清洗】', e:'洗得干净透明'}, {n:'【有机化学】', e:'命名反应式全对'}, {n:'【安全领域】', e:'防止任何事故'}, {n:'〖化学反应〗', e:'微观反应可视化'}]},
+        { name: "黄裕瀚", score: 108, skills: [{n:'【时间线】', e:'大事年表清晰排列'}, {n:'【全家福】', e:'记得所有人物事迹'}, {n:'【犀利分析】', e:'史料分析见解深刻'}, {n:'【脑内地图】', e:'存有疆域演变图'}, {n:'【说书先生】', e:'把历史讲得有趣'}, {n:'【历史全对】', e:'选择题正确率100%'}, {n:'【穿越思维】', e:'如果我是秦始皇'}, {n:'【比较研究】', e:'对比不同文明发展'}, {n:'【影视纠错】', e:'指出不实历史剧'}, {n:'【逻辑大论文】', e:'论文总是最高分'}, {n:'【历史捧哏】', e:'与老师互动良好'}, {n:'【历史现实】', e:'有深度的现实思考'}, {n:'【顺口溜】', e:'自编记忆顺口溜'}, {n:'【覆盖全】', e:'很少错题知识点全'}, {n:'【博览群书】', e:'阅读量远超课本'}, {n:'【证据充分】', e:'辩论中引经据典'}, {n:'【朝代歌】', e:'顺序绝不会乱'}, {n:'【史料过目】', e:'看一遍就记住'}, {n:'【满分模板】', e:'总结大题答题技巧'}, {n:'〖历史长河〗', e:'沉浸式历史体验'}]},
+        { name: "金依娴", score: 121, skills: [{n:'【脑内GPS】', e:'自带高清世界地图'}, {n:'【气候全能】', e:'气候分布倒背如流'}, {n:'【数据记忆】', e:'数据随口说出'}, {n:'【绘图高手】', e:'手绘地图精准'}, {n:'【现象解释】', e:'科学又生动的解释'}, {n:'【地球仪控】', e:'常弄教室的地球仪'}, {n:'【冷锋过境】', e:'预测今天下雨'}, {n:'【地理秒杀】', e:'读题即选正确答案'}, {n:'【地貌辨认】', e:'看到图就知道地貌'}, {n:'【计算精准】', e:'时区计算毫无压力'}, {n:'【环保意识】', e:'提出地理环保建议'}, {n:'【旅游储备】', e:'未去过也全都知道'}, {n:'【泥沙模型】', e:'地形模型栩栩如生'}, {n:'【老师百科】', e:'补充老师忘记的数据'}, {n:'【图文科普】', e:'笔记像科普书'}, {n:'【趣味地理】', e:'用趣味法记知识'}, {n:'【经纬定位】', e:'立马定位城市'}, {n:'【综合大题】', e:'答题全面总满分'}, {n:'【一眼万年】', e:'永久记住地图细节'}, {n:'〖地球视角〗', e:'上帝视角洞察本质'}]},
+        { name: "李晨滢", score: 136, skills: [{n:'【精细记忆】', e:'记住细胞所有细节'}, {n:'【分类大师】', e:'记得清门纲目科'}, {n:'【最佳视野】', e:'显微镜操作熟练'}, {n:'【绘图精细】', e:'标注非常清晰'}, {n:'【好奇心】', e:'对生命现象充满好奇'}, {n:'【生物健康】', e:'用知识提醒同学'}, {n:'【选择全对】', e:'正确率接近100%'}, {n:'【生态系统】', e:'理解成分相互关系'}, {n:'【遗传大师】', e:'各种概率题都会'}, {n:'【进化解读】', e:'解释奇特生物现象'}, {n:'【实验材料】', e:'负责地准备材料'}, {n:'【科普阅读】', e:'读过大量生物书籍'}, {n:'【笔记详细】', e:'包括老师拓展内容'}, {n:'【黏土模型】', e:'各细胞器分明'}, {n:'【不混淆】', e:'术语使用极准确'}, {n:'【多样性】', e:'做相关主题演讲'}, {n:'【自然观察】', e:'发现细微变化'}, {n:'【理清思路】', e:'多对基因秒解'}, {n:'【严谨实验】', e:'变量控制得极好'}, {n:'〖生命感知〗', e:'感知微观生命'}]},
+        { name: "倪瑞祁", score: 47, skills: [{n:'【术语精准】', e:'答题非常规范'}, {n:'【关注时事】', e:'了解国内外大事'}, {n:'【要点全】', e:'绝不漏分'}, {n:'【有深度】', e:'理论分析实际'}, {n:'【排除大师】', e:'排除法又快又准'}, {n:'【成体系】', e:'背诵速度极快'}, {n:'【逻辑强】', e:'辩论赛表现出色'}, {n:'【懂政策】', e:'理解政策背后意义'}, {n:'【分点明确】', e:'笔记条理清晰'}, {n:'【热点分析】', e:'自己的政治角度'}, {n:'【思辨力】', e:'欣赏思辨能力'}, {n:'【社会生活】', e:'应用于社会理解'}, {n:'【概念清晰】', e:'错题极少'}, {n:'【系统复习】', e:'不遗漏知识点'}, {n:'【主导讨论】', e:'见解独到'}, {n:'【阅卷首选】', e:'卷面整洁'}, {n:'【守法楷模】', e:'知法懂法'}, {n:'【评论员】', e:'分析时政专业'}, {n:'【满分结构】', e:'总结大题结构'}, {n:'〖政治思维〗', e:'格局打开'}]},
+        { name: "沈远", score: 51, skills: [{n:'【操作快】', e:'打字速度全班第一'}, {n:'【编程小能手】', e:'解决学习小问题'}, {n:'【PPT大师】', e:'做的美观实用'}, {n:'【检索专家】', e:'快速找到资料'}, {n:'【修电脑】', e:'解决各种小故障'}, {n:'【数据规律】', e:'分析成绩数据'}, {n:'【先锋】', e:'第一个完成作业'}, {n:'【安全员】', e:'注意网络安全'}, {n:'【推荐官】', e:'推荐各种学习APP'}, {n:'【助人为乐】', e:'帮助操作慢的同学'}, {n:'【盲打高手】', e:'眼睛不看键盘'}, {n:'【管理极快】', e:'文件分类清晰'}, {n:'【多媒体奖】', e:'作品获校级奖'}, {n:'【技术竞赛】', e:'获得好成绩'}, {n:'【效率高】', e:'线上学习适应最快'}, {n:'【前沿科技】', e:'关注科技新闻'}, {n:'【编码之魂】', e:'指尖在键盘跳舞'}, {n:'【黑科技】', e:'编小程序背单词'}, {n:'【优化大师】', e:'找到数据优化方案'}, {n:'〖数字思维〗', e:'效率倍增'}]},
+        { name: "王炫茸", score: 103, skills: [{n:'【全神贯注】', e:'美术课作品优秀'}, {n:'【主画】', e:'黑板报设计精美'}, {n:'【范例】', e:'手抄报各科典范'}, {n:'【插图助手】', e:'画图帮助理解'}, {n:'【图形记忆】', e:'效果更好'}, {n:'【审美在线】', e:'色彩搭配和谐'}, {n:'//', e:'质量极高'}, {n:'【装饰官】', e:'为教室出谋划策'}, {n:'【独特创意】', e:'常被老师表扬'}, {n:'【表情包】', e:'画专属表情包'}, {n:'【漫画法】', e:'瞬间记住历史'}, {n:'【图解】', e:'像教科书般精确'}, {n:'【大方】', e:'用品常借同学'}, {n:'【标题王】', e:'写漂亮艺术字'}, {n:'【穿搭建议】', e:'审美水平高'}, {n:'【展览级】', e:'手工作品精巧'}, {n:'【速写】', e:'记录瞬间灵感'}, {n:'【视觉化】', e:'记忆效率翻倍'}, {n:'【源源不断】', e:'让人惊喜的创意'}, {n:'〖艺术思维〗', e:'创造性解决问题'}]},
+        { name: "王子墨", score: 92, skills: [{n:'【音准王】', e:'老师让示范'}, {n:'【能手】', e:'乐器打动人心'}, {n:'【清澈领唱】', e:'歌声好听'}, {n:'【拍子王】', e:'节奏从不出错'}, {n:'【哼唱】', e:'一遍就能记住'}, {n:'【音乐法】', e:'帮助全班记忆'}, {n:'【独到见解】', e:'音乐课分享'}, {n:'【素养高】', e:'鉴赏发言专业'}, {n:'【校赛苗子】', e:'专业老师指导'}, {n:'【文艺委员】', e:'积极组织活动'}, {n:'【平衡木】', e:'调节学习情绪'}, {n:'//', e:'了解各种名家'}, {n:'【深赏析】', e:'音乐作业认真'}, {n:'【才华】', e:'尝试创作旋律'}, {n:'【朗朗上口】', e:'节奏辅助背诵'}, {n:'【看谱快】', e:'知识扎实'}, {n:'【绝对音准】', e:'天生音感'}, {n:'【旋律编码】', e:'将知识变旋律'}, {n:'【传唱】', e:'创作学习主题曲'}, {n:'〖音乐共鸣〗', e:'优化全班状态'}]},
+        { name: "王子睿", score: 40, skills: [{n:'【身体棒】', e:'各项表现优秀'}, {n:'【金牌】', e:'运动会多金王'}, {n:'【阳光活力】', e:'课间积极活动'}, {n:'【合作】', e:'尊重对手'}, {n:'【跳绳王】', e:'带领锻炼'}, {n:'【公正】', e:'规则专家'}, {n:'【认真】', e:'每天体育锻炼'}, {n:'【健康】', e:'科学运动'}, {n:'【勤快】', e:'帮老师拿器材'}, {n:'【运动高效】', e:'运动后学习快'}, {n:'//', e:'文体兼顾'}, {n:'【体力好】', e:'参与活动组织'}, {n:'【心理稳】', e:'发挥稳定'}, {n:'【安全官】', e:'提醒运动安全'}, {n:'【榜样】', e:'体育方面的榜样'}, {n:'【硬骨头】', e:'攻克难题'}, {n:'【爆发力】', e:'短跑和思维快'}, {n:'//', e:'恢复极快'}, {n:'【球场协作】', e:'带入小组学习'}, {n:'〖毅力爆发〗', e:'硬啃学习难题'}]},
+        { name: "谢睿彤", score: 60, skills: [{n:'【任劳任怨】', e:'不怕脏累'}, {n:'【利索】', e:'承担最累活'}, {n:'【卫士】', e:'主动捡垃圾'}, {n:'【修理工】', e:'修理简单物品'}, {n:'【装饰物】', e:'废物利用'}, {n:'【责任心】', e:'认真负责课代表'}, {n:'【大方】', e:'帮同学完成'}, {n:'【高度评价】', e:'成果出色'}, {n:'【效率高】', e:'分工合理'}, {n:'【爱护】', e:'清理归还工具'}, {n:'【熟练】', e:'在家是好帮手'}, {n:'【绿植】', e:'长势喜人'}, {n:'【分享】', e:'带小绿植给大家'}, {n:'【不怕累】', e:'劳动精神'}, {n:'【勤劳】', e:'在教室忙碌'}, {n:'【细致】', e:'手工活精美'}, {n:'【腾时间】', e:'高效完成'}, {n:'【规划】', e:'迁移到学习'}, {n:'【感悟】', e:'实践出真知'}, {n:'〖出真知〗', e:'深刻理解抽象概念'}]},
+        { name: "杨依然", score: 93, skills: [{n:'【阳光】', e:'调节自己'}, {n:'【安抚】', e:'安抚同学情绪'}, {n:'【从容】', e:'管理压力'}, {n:'【感染力】', e:'乐观向上'}, {n:'【提高效率】', e:'应用心理知识'}, {n:'【助人】', e:'咨询室常客'}, {n:'【反思】', e:'认真写日记'}, {n:'【信任】', e:'帮困扰同学'}, {n:'【关心】', e:'关注同学状态'}, {n:'【广博】', e:'读心理书籍'}, {n:'【远大】', e:'动机明确'}, {n:'【复原力】', e:'面对挫折'}, {n:'【顺畅】', e:'沟通融洽'}, {n:'【提升】', e:'认知清晰'}, {n:'【深呼吸】', e:'放松技巧'}, {n:'【能量足】', e:'乐于助人'}, {n:'【善解人意】', e:'站在别人角度'}, {n:'【重新投入】', e:'走出情绪'}, {n:'【动力】', e:'压力变动力'}, {n:'〖心理韧性〗', e:'面对逆境成长'}]},
+        { name: "叶卓骐", score: 46, skills: [{n:'【好奇心】', e:'钻研劲足'}, {n:'【实验控】', e:'动手尝试'}, {n:'【小博士】', e:'博览科普书'}, {n:'【太阳能】', e:'科学小制作'}, {n:'【探索者】', e:'带领大家探索'}, {n:'【不懈】', e:'探索精神'}, {n:'【好成绩】', e:'参加竞赛'}, {n:'【应用】', e:'方法迁移'}, {n:'【严谨】', e:'尊重事实'}, {n:'【激发】', e:'知识分享'}, {n:'【前沿】', e:'关注AI'}, {n:'【合理有趣】', e:'科学幻想'}, {n:'【厚实】', e:'包括拓展内容'}, {n:'【实践力】', e:'校园调查'}, {n:'【创新】', e:'敢于质疑'}, {n:'【脑洞】', e:'总有新奇点子'}, {n:'【破案】', e:'逻辑严密'}, {n:'【跨学科】', e:'解决复杂问题'}, {n:'【验证】', e:'设计严谨实验'}, {n:'〖真理追求〗', e:'进入深度探索'}]},
+        { name: "张昕瑜", score: 136, skills: [{n:'【统筹】', e:'协调各方'}, {n:'【共赢】', e:'1+1>2'}, {n:'【发挥特长】', e:'分工合理'}, {n:'【一家人】', e:'更团结'}, {n:'【典范】', e:'获表扬'}, {n:'【最优解】', e:'妥善解决'}, {n:'【带领】', e:'实现目标'}, {n:'【影响全班】', e:'传播精神'}, {n:'【事半功倍】', e:'效率极高'}, {n:'【共同进步】', e:'分享成果'}, {n:'【处理得当】', e:'平衡需求'}, {n:'【默契】', e:'组织活动'}, {n:'【虚心】', e:'接受反馈'}, {n:'【为班争光】', e:'荣誉感强'}, {n:'【高级】', e:'掌握技巧'}, {n:'【稳如山】', e:'团队之魂'}, {n:'【准确】', e:'传达信息'}, {n:'【挖掘潜力】', e:'激励成员'}, {n:'【果断】', e:'达成方案'}, {n:'〖协同增效〗', e:'效果爆表'}]},
+        { name: "郑熙熙", score: 134, skills: [{n:'【书虫】', e:'静若处子'}, {n:'【透彻】', e:'速度极快'}, {n:'【广博】', e:'无所不读'}, {n:'【丰富积累】', e:'摘抄好句'}, {n:'【推荐】', e:'分享心得'}, {n:'【文采】', e:'引经据典'}, {n:'【VIP】', e:'图书馆常客'}, {n:'【氛围好】', e:'组织分享'}, {n:'【独到】', e:'把握含义'}, {n:'【基础厚】', e:'辅助各科'}, {n:'【雷打不动】', e:'固定习惯'}, {n:'【书香】', e:'环境创造'}, {n:'【不随大流】', e:'独立思考'}, {n:'【优质】', e:'资源推荐'}, {n:'【标杆】', e:'阅读榜样'}, {n:'【乐此不疲】', e:'文字之美'}, {n:'【用词精准】', e:'庞大词库'}, {n:'【快速摄取】', e:'效率恐怖'}, {n:'【融合】', e:'形成体系'}, {n:'〖智慧汲取〗', e:'深度吸收'}]},
+        { name: "周卓宸", score: 6, skills: [{n:'【强执行】', e:'计划到分'}, {n:'【合理】', e:'设定挑战'}, {n:'【分秒必争】', e:'时间管理'}, {n:'【先做重要】', e:'判断准确'}, {n:'【灵活】', e:'不僵化'}, {n:'【自律】', e:'完成率高'}, {n:'【辅助】', e:'使用工具'}, {n:'【教大家】', e:'经验分享'}, {n:'【兼顾】', e:'长短目标'}, {n:'【持续改进】', e:'定期总结'}, {n:'【好习惯】', e:'通过计划养成'}, {n:'【成就感】', e:'自我激励'}, {n:'【节约时间】', e:'帮助同学'}, {n:'【模范】', e:'计划榜样'}, {n:'【高效能】', e:'劳逸结合'}, {n:'【满分】', e:'执行力'}, {n:'【意志坚定】', e:'今日事毕'}, {n:'【多任务】', e:'并行处理'}, {n:'【魔人】', e:'持续优化'}, {n:'〖目标必达〗', e:'必达成'}]}
+    ];
+
+    // 全局技能池初始化
+    const MASTER_NORMAL = [], MASTER_STRONG = [], MASTER_ULT = [];
+    RAW_STUDENTS_DATA.forEach(s => {
+        s.skills.forEach((sk, idx) => {
+            if (idx < 17) MASTER_NORMAL.push(sk);
+            else if (idx < 19) MASTER_STRONG.push(sk);
+            else MASTER_ULT.push(sk);
+        });
+    });
+
+    const BOSS_QUOTES = ["反思写了吗？！", "抬头看黑板！", "校裤穿了吗？！", "讲了几遍了？！"];
+    let selectedFighters = [];
+    let fighters = [];
+    let isBossMode = false;
+    let isFighting = false;
+    let bossHP = 30000;
+    let audioCtx = null;
+
+    // 清理界面
+    function clearArena() {
+        document.querySelectorAll('.fighter').forEach(f => f.remove());
+        document.getElementById('victory-screen').style.display = 'none';
+        document.getElementById('victory-screen').classList.remove('horror');
+    }
+
+    // 初始化选人区 - 核心修复点：确保每次加载逻辑一致
+    function init() {
+        const grid = document.getElementById('roster-grid');
+        grid.innerHTML = "";
+        RAW_STUDENTS_DATA.forEach((s, idx) => {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.innerText = s.name;
+            chip.onclick = () => {
+                if(isFighting) return;
+                const fIdx = selectedFighters.findIndex(f => f.name === s.name);
+                if(fIdx > -1) {
+                    selectedFighters.splice(fIdx, 1);
+                    chip.classList.remove('selected');
+                } else {
+                    if(!isBossMode && selectedFighters.length >= 10) return;
+                    selectedFighters.push({...s, id: idx});
+                    chip.classList.add('selected');
+                }
+                updateBtnState();
+            };
+            grid.appendChild(chip);
+        });
+        updateBtnState();
+    }
+
+    function updateBtnState() {
+        const btn = document.getElementById('start-btn');
+        btn.disabled = selectedFighters.length < (isBossMode ? 1 : 3);
+    }
+
+    function toggleMode() {
+        if(isFighting) return;
+        isBossMode = !isBossMode;
+        document.body.classList.toggle('boss-mode');
+        document.getElementById('boss-entity').style.display = isBossMode ? 'flex' : 'none';
+        document.getElementById('mode-btn').innerText = isBossMode ? "🔙 ROYALE" : "💀 BOSS";
+        document.getElementById('main-title').innerText = isBossMode ? "💀 TEACHER CHASE" : "🍭 DOJO ROYALE";
+        clearArena();
+        selectedFighters = []; 
+        init();
+    }
+
+    async function startMatch() {
+        if(isFighting) return;
+        isFighting = true;
+        document.getElementById('start-btn').disabled = true;
+        document.querySelector('.roster-area').style.opacity = 0.3;
+        
+        fighters = selectedFighters.map(f => {
+            const myNormals = [...MASTER_NORMAL].sort(() => 0.5 - Math.random()).slice(0, 17);
+            const myStrongs = [...MASTER_STRONG].sort(() => 0.5 - Math.random()).slice(0, 2);
+            const myUlt = MASTER_ULT[Math.floor(Math.random() * MASTER_ULT.length)];
+            return {
+                ...f, hp: 100, 
+                emoji: EMOJI_LIBRARY[Math.floor(Math.random() * EMOJI_LIBRARY.length)],
+                blockRate: Math.max(1, Math.min(15, f.score/10)),
+                currentSkills: [...myNormals, ...myStrongs, myUlt]
+            };
+        });
+
+        document.querySelectorAll('.fighter').forEach(f => f.remove());
+        setupArena();
+        initAudio();
+        if (isBossMode) await bossCycle();
+        else await royaleCycle();
+    }
+
+    function setupArena() {
+        const arena = document.getElementById('arena');
+        const scale = (isBossMode && fighters.length > 10) ? 0.7 : 1.0; 
+        fighters.forEach((f, i) => {
+            const div = document.createElement('div');
+            div.className = 'fighter';
+            div.id = `f-${f.id}`;
+            const angle = (i / fighters.length) * Math.PI + Math.PI; 
+            const rX = arena.offsetWidth * 0.42;
+            const rY = isBossMode ? arena.offsetHeight * 0.12 : arena.offsetHeight * 0.25;
+            const centerY = isBossMode ? arena.offsetHeight * 0.85 : arena.offsetHeight * 0.65;
+            div.style.left = `${Math.cos(angle) * rX + arena.offsetWidth/2 - 40}px`;
+            div.style.top = `${Math.sin(angle) * rY + centerY - 40}px`;
+            div.style.transform = `scale(${scale})`;
+            div.innerHTML = `<div class="hp-box"><div class="hp-fill" id="hp-bar-${f.id}"></div></div><div class="avatar" id="av-${f.id}">${f.emoji}</div><div class="name-tag">${f.name}</div>`;
+            arena.appendChild(div);
+        });
+    }
+
+    async function attack(attacker, target) {
+        const skillIdx = Math.floor(Math.random() * 20);
+        const skill = attacker.currentSkills[skillIdx];
+        let dmg = 0, isUlt = (skillIdx === 19);
+
+        if (skillIdx < 17) dmg = Math.floor(Math.random() * 11) + 5;
+        else if (skillIdx < 19) dmg = Math.floor(Math.random() * 16) + 20;
+        else dmg = Math.floor(Math.random() * 31) + 50;
+
+        const blocked = (Math.random() * 100) < (target.isBoss ? 5 : target.blockRate);
+        document.getElementById('ui-skill').innerText = skill.n;
+        document.getElementById('ui-desc').innerText = skill.e;
+        document.getElementById('ui-msg').innerText = `➡ ${target.name} ${blocked ? '🛡️ 被格挡了！' : '(-'+dmg+')'}`;
+
+        const atkEl = document.getElementById(`f-${attacker.id}`);
+        const tarEl = target.isBoss ? document.getElementById('boss-entity') : document.getElementById(`f-${target.id}`);
+        const ox = parseFloat(atkEl.style.left), oy = parseFloat(atkEl.style.top);
+        const tx = target.isBoss ? window.innerWidth/2-40 : parseFloat(tarEl.style.left);
+        const ty = target.isBoss ? window.innerHeight*0.22-40 : parseFloat(tarEl.style.top);
+
+        if(isUlt) { triggerFlash(); atkEl.style.zIndex = 2000; }
+        playSnd(blocked ? 'duang' : (isUlt ? 'bong' : 'jiu'));
+        atkEl.style.transform += ` translate(${tx-ox}px, ${ty-oy}px) scale(${isUlt ? 2 : 1.3})`;
+        await new Promise(r => setTimeout(r, 150));
+
+        if(!blocked) {
+            if(target.isBoss) bossHP -= dmg * 10;
+            else {
+                target.hp -= dmg;
+                document.getElementById(`hp-bar-${target.id}`).style.width = Math.max(0, target.hp) + '%';
+                if(target.hp <= 0) {
+                    document.getElementById(`av-${target.id}`).innerText = "💀";
+                    document.getElementById(`f-${target.id}`).classList.add('dead');
+                    playFartSnd();
+                }
+            }
+        }
+        atkEl.style.transform = atkEl.style.transform.split(' translate')[0];
+        setTimeout(() => atkEl.style.zIndex = 10, 150);
+    }
+
+    async function bossCycle() {
+        bossHP = 30000;
+        while (bossHP > 0 && fighters.filter(f => f.hp > 0).length > 0) {
+            const alive = fighters.filter(f => f.hp > 0);
+            for(let f of alive) {
+                await attack(f, {name: "CHASE", isBoss: true});
+                if(bossHP <= 0) break;
+                await new Promise(r => setTimeout(r, 450));
+            }
+            if(bossHP <= 0) break;
+
+            const isSmiley = Math.random() < 0.25; 
+            const bossEmoji = document.getElementById('boss-emoji');
+            
+            if (isSmiley) {
+                bossEmoji.innerText = "😊";
+                document.getElementById('ui-skill').innerText = "CHASE: 保持微笑 :)";
+                document.getElementById('ui-desc').innerText = "老师露出了极度诡异的笑容...";
+                document.getElementById('ui-msg').innerText = "全体强制扣除 50 HP !!";
+                playSnd('bong'); document.body.classList.add('shake-screen'); triggerFlash();
+                alive.forEach(f => {
+                    f.hp -= 50;
+                    document.getElementById(`hp-bar-${f.id}`).style.width = Math.max(0, f.hp) + '%';
+                    if(f.hp <= 0) { document.getElementById(`av-${f.id}`).innerText = "💀"; document.getElementById(`f-${f.id}`).classList.add('dead'); playFartSnd(); }
+                });
+            } else {
+                bossEmoji.innerText = "👿";
+                document.getElementById('ui-skill').innerText = "CHASE: " + BOSS_QUOTES[Math.floor(Math.random()*4)];
+                document.getElementById('ui-desc').innerText = "老师投来了毁灭性的目光...";
+                document.getElementById('ui-msg').innerText = "全体 HP -25";
+                playSnd('bong'); document.body.classList.add('shake-screen');
+                alive.forEach(f => {
+                    f.hp -= 25;
+                    document.getElementById(`hp-bar-${f.id}`).style.width = Math.max(0, f.hp) + '%';
+                    if(f.hp <= 0) { document.getElementById(`av-${f.id}`).innerText = "💀"; document.getElementById(`f-${f.id}`).classList.add('dead'); playFartSnd(); }
+                });
+            }
+            setTimeout(() => { document.body.classList.remove('shake-screen'); bossEmoji.innerText = "👿"; }, 500);
+            await new Promise(r => setTimeout(r, 1500));
+        }
+        showWinner(bossHP <= 0 ? {name: "学生军团", emoji: "🏆"} : {name: "CHASE", emoji: "👿"});
+    }
+
+    async function royaleCycle() {
+        while (fighters.filter(f => f.hp > 0).length > 1) {
+            const alive = fighters.filter(f => f.hp > 0);
+            const attacker = alive[Math.floor(Math.random() * alive.length)];
+            const target = alive.filter(f => f !== attacker)[Math.floor(Math.random() * (alive.length - 1))];
+            await attack(attacker, target);
+            await new Promise(r => setTimeout(r, 800));
+        }
+        showWinner();
+    }
+
+    function initAudio() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    function playFartSnd() {
+        if(!audioCtx) return;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(100, audioCtx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
+        g.gain.setValueAtTime(0.2, audioCtx.currentTime); g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.3);
+    }
+    function playSnd(t) {
+        if(!audioCtx) return;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.connect(g); g.connect(audioCtx.destination); const now = audioCtx.currentTime;
+        if(t==='jiu'){o.type='square';o.frequency.setValueAtTime(1000,now);o.frequency.exponentialRampToValueAtTime(100,now+0.1);}
+        if(t==='bong'){o.type='triangle';o.frequency.setValueAtTime(150,now);g.gain.setValueAtTime(0.4,now);}
+        if(t==='duang'){o.type='sawtooth';o.frequency.setValueAtTime(200,now);o.frequency.linearRampToValueAtTime(600,now+0.15);}
+        o.start(); o.stop(now+0.2);
+    }
+    function playVictoryAudio(isHorror) {
+        let time = audioCtx.currentTime;
+        if(isHorror) {
+            for(let i=0; i<15; i++) {
+                const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+                o.type='sawtooth'; o.frequency.setValueAtTime(Math.random()*50+40, time + i*0.3);
+                o.frequency.linearRampToValueAtTime(Math.random()*100+20, time + i*0.3 + 0.2);
+                g.gain.setValueAtTime(0.2, time+i*0.3); g.gain.linearRampToValueAtTime(0, time+i*0.3+0.2);
+                o.connect(g); g.connect(audioCtx.destination); o.start(time+i*0.3); o.stop(time+i*0.3+0.3);
+            }
+        } else {
+            const melody = [{f:523,d:0.4},{f:659,d:0.4},{f:783,d:0.4},{f:1046,d:0.8},{f:783,d:0.4},{f:1046,d:1.2}];
+            melody.forEach(n => {
+                const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+                o.type='square'; o.frequency.setValueAtTime(n.f,time); g.gain.setValueAtTime(0.1,time);
+                o.connect(g); g.connect(audioCtx.destination); o.start(time); o.stop(time+n.d); time+=n.d;
+            });
+        }
+    }
+    function triggerFlash() {
+        const f = document.getElementById('flash'); f.style.opacity = 0.5;
+        setTimeout(() => f.style.opacity = 0, 100);
+    }
+
+    function showWinner(bossWinner) {
+        isFighting = false;
+        const winner = bossWinner || fighters.find(f => f.hp > 0);
+        const vs = document.getElementById('victory-screen');
+        const isHorror = bossWinner && bossWinner.name === "CHASE";
+        if(isHorror) vs.classList.add('horror'); else vs.classList.remove('horror');
+        playVictoryAudio(isHorror);
+        document.getElementById('v-emoji').innerText = winner ? winner.emoji : "💀";
+        document.getElementById('v-name').innerText = winner ? (winner.name + " 终结了战斗！") : "无人生还...";
+        vs.style.display = 'flex';
+        document.getElementById('start-btn').disabled = false;
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
